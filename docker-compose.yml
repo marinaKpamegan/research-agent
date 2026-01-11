@@ -1,0 +1,34 @@
+# backend/docker/docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: researchagent-db
+    restart: always
+    environment:
+      POSTGRES_DB: researchagent
+      POSTGRES_USER: researchagent
+      POSTGRES_PASSWORD: researchagent
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: researchagent-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://researchagent:researchagent@db:5432/researchagent
+      - DEBUG=True
+    depends_on:
+      - db
+    volumes:
+      - ../.env:/app/.env  
+
+volumes:
+  postgres_data:

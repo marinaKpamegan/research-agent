@@ -1,0 +1,16 @@
+node_modules
+.next
+.DS_Store
+.env
+.env.development.local
+.env.test.local
+
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+.vscode
+.idea
+dist
+build
+out
+coverage
