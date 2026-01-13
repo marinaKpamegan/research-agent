@@ -1,4 +1,4 @@
-from c import BaseModel
+from pydantic import BaseModel
 from typing import List, Optional
 
 class ResearchQuery(BaseModel):
@@ -10,9 +10,12 @@ class SourceItem(BaseModel):
     title: str
     url: str
     snippet: str
-    is_trusted: bool = False  # ← NEW FIELD
+    is_trusted: bool = False  # ← Indicates if the source is from trusted_sources
 
 class ResearchResponse(BaseModel):
     answer: str
     sources: List[SourceItem]
     used_context: Optional[str] = None  # e.g., "Focused on: Edge AI"
+
+# Backwards-compatible alias expected by other modules
+Query = ResearchQuery
