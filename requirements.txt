@@ -4,3 +4,7 @@ httpx
 beautifulsoup4
 pydantic
 validators
+arxiv
+sqlalchemy
+passlib[bcrypt]
+python-jose[cryptography]
