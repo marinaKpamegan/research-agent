@@ -5,14 +5,20 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.db.crud import get_user_by_username
+from app.repositories.user import UserRepository
 from app.schemas.user import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
+
+
+def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
+    return UserRepository(db)
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    token: str = Depends(oauth2_scheme),
+    user_repo: UserRepository = Depends(get_user_repository),
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -28,7 +34,8 @@ def get_current_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    user = get_user_by_username(db, username=username)
+    
+    user = user_repo.get_by_username(username=username)
     if user is None:
         raise credentials_exception
     return user

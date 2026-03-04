@@ -59,7 +59,7 @@ A minimal, extensible research agent service exposing a single HTTP API to accep
 uvicorn app.main:app --reload
 ```
 
-- Visit OpenAPI: `http://127.0.0.1:8000/api/docs`.
+- Visit OpenAPI: `http://127.0.0.1:8000/docs`.
 
 ## File map (quick)
 - app/main.py — app bootstrap and OpenAPI settings

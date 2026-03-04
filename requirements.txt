@@ -7,4 +7,9 @@ validators
 arxiv
 sqlalchemy
 passlib[bcrypt]
+bcrypt==4.0.1
 python-jose[cryptography]
+pydantic_settings
+python-multipart
+psycopg2-binary
+python-dotenv
