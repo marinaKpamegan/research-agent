@@ -15,6 +15,8 @@ app = FastAPI(
     version="0.1.0",
 )
 
+from fastapi.middleware.cors import CORSMiddleware
+
 @app.on_event("startup")
 def on_startup():
     try:
@@ -22,6 +24,15 @@ def on_startup():
             logger.info("Successfully connected to the PostgreSQL database.")
     except Exception as e:
         logger.error(f"Failed to connect to the database: {e}")
+
+# Enable CORS with allow_credentials=True needed for cookies
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], # Add frontend origins here
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(query_router, prefix="/api", tags=["query"])
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])

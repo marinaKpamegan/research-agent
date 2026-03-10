@@ -1,5 +1,4 @@
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, Request
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
@@ -9,15 +8,12 @@ from app.repositories.user import UserRepository
 from app.schemas.user import User
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
-
-
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
     return UserRepository(db)
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
     user_repo: UserRepository = Depends(get_user_repository),
 ):
     credentials_exception = HTTPException(
@@ -25,6 +21,20 @@ def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # Try fetching the token from cookies first
+    token = request.cookies.get("access_token")
+    if not token:
+        # Fallback to Authorization header if you still need it to be API compatible
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise credentials_exception
+        token = auth_header
+
+    # Clean off "Bearer " if it's there
+    if token.startswith("Bearer "):
+        token = token.replace("Bearer ", "", 1)
+        
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]

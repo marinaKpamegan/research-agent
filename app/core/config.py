@@ -20,6 +20,7 @@ class Settings:
     DATABASE_URL: str = _build_db_url()
     SECRET_KEY: str = os.getenv("SECRET_KEY", "a_secret_key")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
     PROJECT_DIR: str = str(pathlib.Path(__file__).resolve().parents[2])
     MEMORY_PATH: str = str(pathlib.Path(PROJECT_DIR) / "app" / "memory" / "memory.json")
 
