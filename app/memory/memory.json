@@ -6,5 +6,27 @@
   {
     "question": "What is the capital of France?",
     "summary": "Results for What is the capital of France?"
+  },
+  {
+    "question": "What are the latest breakthroughs in room-temperature superconductivity in 2024?",
+    "summary": "Research completed for 'What are the latest breakthroughs in room-temperature superconductivity in 2024?'. Found 0 URLs and successfully crawled 0 pages.",
+    "keywords": [
+      "room-temperature superconductivity 2024",
+      "LK-99 developments",
+      "ambient superconductivity breakthroughs",
+      "superconductor research updates"
+    ],
+    "urls": []
+  },
+  {
+    "question": "What are the latest breakthroughs in room-temperature superconductivity in 2024?",
+    "keywords": [
+      "Room-temperature superconductivity 2024",
+      "Superconductor breakthroughs 2024",
+      "Ambient superconductivity research",
+      "High-temperature superconductivity advancements"
+    ],
+    "urls": [],
+    "content": []
   }
 ]

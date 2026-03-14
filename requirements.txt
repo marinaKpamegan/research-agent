@@ -13,3 +13,12 @@ pydantic_settings
 python-multipart
 psycopg2-binary
 python-dotenv
+langchain-openrouter
+crawl4ai
+langchain-community
+faiss-cpu
+sentence-transformers
+transformers
+torch
+duckduckgo-search
+langgraph
