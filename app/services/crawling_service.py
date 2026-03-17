@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from typing import List, Optional
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, DefaultMarkdownGenerator
 from crawl4ai.deep_crawling import BestFirstCrawlingStrategy
 from crawl4ai.deep_crawling.scorers import KeywordRelevanceScorer
 from crawl4ai.content_scraping_strategy import LXMLWebScrapingStrategy
@@ -50,6 +50,9 @@ class CrawlingService:
         run_config = CrawlerRunConfig(
             deep_crawl_strategy=strategy,
             scraping_strategy=LXMLWebScrapingStrategy(),
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
+            exclude_external_links=True,
+            exclude_social_media_links=True,
             stream=True,  # Utiliser le streaming pour plus de réactivité
             cache_mode="BYPASS"  # Forcer un nouveau crawl
         )
@@ -76,4 +79,48 @@ class CrawlingService:
             raise
 
         logger.info(f"Deep crawl terminé. {len(results)} pages récupérées.")
+        return results
+
+    async def scrape_urls(self, urls: List[str]) -> List[dict]:
+        """
+        Effectue un scraping simple (non récursif) pour une liste d'URLs.
+        
+        Args:
+            urls: Liste des URLs à scraper.
+            
+        Returns:
+            Liste de dictionnaires contenant l'URL et le contenu markdown.
+        """
+        logger.info(f"Démarrage du scraping simple pour {len(urls)} URLs")
+        
+        results = []
+        
+        # Configurer l'exécution du crawler pour exclure les liens
+        run_config = CrawlerRunConfig(
+            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
+            exclude_external_links=True,
+            exclude_social_media_links=True,
+            cache_mode="BYPASS"
+        )
+
+        try:
+            async with AsyncWebCrawler() as crawler:
+                # On utilise arun_many pour plus d'efficacité
+                crawl_results = await crawler.arun_many(urls=urls, config=run_config)
+                
+                for result in crawl_results:
+                    if result.success:
+                        results.append({
+                            "url": result.url,
+                            "title": result.metadata.get("title", ""),
+                            "markdown": result.markdown
+                        })
+                    else:
+                        logger.warning(f"Échec du scraping pour {result.url}: {result.error_message}")
+        
+        except Exception as e:
+            logger.error(f"Erreur lors du scraping groupé: {str(e)}", exc_info=True)
+            raise
+
+        logger.info(f"Scraping terminé. {len(results)} pages récupérées.")
         return results

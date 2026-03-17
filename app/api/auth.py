@@ -33,7 +33,7 @@ def register_user(
         httponly=True,
         samesite="lax",
         secure=False, # Set to True in production with HTTPS
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 3600,
     )
     
     return {"message": "Successfully registered and logged in"}

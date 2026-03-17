@@ -22,3 +22,5 @@ transformers
 torch
 duckduckgo-search
 langgraph
+sentencepiece
+protobuf

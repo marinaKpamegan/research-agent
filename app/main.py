@@ -3,6 +3,7 @@ from app.api.query import router as query_router
 from app.api.auth import router as auth_router
 from app.api.preferences import router as preferences_router
 from app.api.preferred_links import router as preferred_links_router
+from app.api.ingestion import router as ingestion_router
 
 
 from app.core.logging_config import setup_logging
@@ -44,6 +45,7 @@ app.include_router(query_router, prefix="/api", tags=["query"])
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(preferences_router, prefix="/api/preferences", tags=["preferences"])
 app.include_router(preferred_links_router, prefix="/api/preferred-links", tags=["preferred-links"])
+app.include_router(ingestion_router, prefix="/api/ingestion", tags=["ingestion"])
 
 if __name__ == "__main__":
     import uvicorn

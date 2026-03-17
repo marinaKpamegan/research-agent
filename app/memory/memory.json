@@ -45,5 +45,53 @@
       "https://www.zhihu.com/question/12113462690"
     ],
     "content": []
+  },
+  {
+    "question": "Quelles sont les dernières nouvelles d'OpenAI ?",
+    "interests": [
+      "Éducation",
+      "Intelligence Artificielle",
+      "Technologie"
+    ],
+    "preferred_links": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "keywords": [
+      "OpenAI actualités",
+      "dernières nouvelles OpenAI",
+      "OpenAI IA éducation",
+      "OpenAI technologie",
+      "OpenAI mises à jour"
+    ],
+    "urls": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "content": []
+  },
+  {
+    "question": "Quelles sont les dernières nouvelles dans la data science ?",
+    "interests": [
+      "Éducation",
+      "Intelligence Artificielle",
+      "Technologie"
+    ],
+    "preferred_links": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "keywords": [
+      "Actualités data science",
+      "Dernières avancées data science",
+      "Nouveautés data science",
+      "Intelligence Artificielle data science",
+      "Technologie data science"
+    ],
+    "urls": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "content": []
   }
 ]
