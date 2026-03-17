@@ -4,6 +4,11 @@ from app.api.auth import router as auth_router
 from app.api.preferences import router as preferences_router
 
 
+from app.core.logging_config import setup_logging
+
+# Initialize logging
+setup_logging()
+
 import logging
 from app.db.session import engine
 

@@ -10,11 +10,14 @@ def get_preferences(db: Session, user_id: int):
 def create_user_preferences(
     db: Session, preferences: PreferenceCreate, user_id: int
 ):
+    # Enlever les champs qu'on va passer explicitement en tant que strings
+    pref_dict = preferences.dict(exclude={"interests", "preferred_links"})
+    
     db_preferences = Preference(
-        **preferences.dict(),
+        **pref_dict,
         owner_id=user_id,
-        interests=",".join(preferences.interests),
-        preferred_links=",".join(preferences.preferred_links)
+        interests=",".join(preferences.interests) if preferences.interests else "",
+        preferred_links=",".join(preferences.preferred_links) if preferences.preferred_links else ""
     )
     db.add(db_preferences)
     db.commit()
@@ -25,8 +28,8 @@ def create_user_preferences(
 def update_user_preferences(
     db: Session, db_preferences: Preference, preferences: PreferenceUpdate
 ):
-    db_preferences.interests = ",".join(preferences.interests)
-    db_preferences.preferred_links = ",".join(preferences.preferred_links)
+    db_preferences.interests = ",".join(preferences.interests) if preferences.interests else ""
+    db_preferences.preferred_links = ",".join(preferences.preferred_links) if preferences.preferred_links else ""
     db.commit()
     db.refresh(db_preferences)
     return db_preferences

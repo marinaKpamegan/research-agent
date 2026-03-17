@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.schemas.user import UserCreate, User
+from app.schemas.user import UserCreate, User, UserLogin
 from app.core.security import create_access_token
 from app.core.config import settings
 from app.api.deps import get_user_repository, get_current_user
-from app.repositories.user import UserRepository
+from app.db.repositories.user import UserRepository
 
 router = APIRouter()
 
@@ -42,11 +42,11 @@ def register_user(
 @router.post("/login")
 def login_for_access_token(
     response: Response,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    login_data: UserLogin,
     user_repo: UserRepository = Depends(get_user_repository),
 ):
-    user = user_repo.get_by_username(username=form_data.username)
-    if not user or not user.verify_password(form_data.password):
+    user = user_repo.get_by_username(username=login_data.username)
+    if not user or not user.verify_password(login_data.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

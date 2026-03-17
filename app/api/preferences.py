@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.preference import Preference, PreferenceCreate, PreferenceUpdate
 from app.db.session import get_db
-from app.db.crud.preference import (
+from app.db.repositories.preference import (
     get_preferences,
     create_user_preferences,
     update_user_preferences,

@@ -14,6 +14,8 @@ class User(Base):
     password = Column(String)
 
     preferences = relationship("Preference", back_populates="owner")
+    preferred_links = relationship("PreferredLink", back_populates="owner")
+    feeds = relationship("Feed", back_populates="owner")
 
     def verify_password(self, plain_password: str) -> bool:
         return _verify_password(plain_password, self.password)
