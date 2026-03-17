@@ -15,7 +15,6 @@ class Preference(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     interests = Column(String)  # Storing as comma-separated string
-    preferred_links = Column(String)  # Storing as comma-separated string
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="preferences")

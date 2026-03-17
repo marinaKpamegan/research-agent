@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS preferred_links (
     id SERIAL PRIMARY KEY,
     url VARCHAR NOT NULL,
     name VARCHAR NOT NULL,
-    user_id INTEGER REFERENCES users (id) ON DELETE CASCADE
+    user_id INTEGER REFERENCES users (id) ON DELETE CASCADE,
+    is_trusted BOOLEAN DEFAULT FALSE,
+    UNIQUE (user_id, url)
 );
 
 CREATE INDEX IF NOT EXISTS ix_preferred_links_id ON preferred_links (id);

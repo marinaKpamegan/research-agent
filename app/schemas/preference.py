@@ -1,10 +1,9 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 
 
 class PreferenceBase(BaseModel):
     interests: Optional[List[str]] = []
-    preferred_links: Optional[List[str]] = []
 
 
 class PreferenceCreate(PreferenceBase):
@@ -17,7 +16,14 @@ class PreferenceUpdate(PreferenceBase):
 
 class Preference(PreferenceBase):
     id: int
-    owner_id: int
+    user_id: int
+
+    @field_validator("interests", mode="before")
+    @classmethod
+    def split_interests(cls, v):
+        if isinstance(v, str):
+            return [i.strip() for i in v.split(",") if i.strip()]
+        return v
 
     class Config:
         from_attributes = True

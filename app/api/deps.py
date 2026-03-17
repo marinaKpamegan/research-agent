@@ -5,11 +5,26 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.db.repositories.user import UserRepository
+from app.db.repositories.preference import PreferenceRepository
+from app.db.repositories.feed import FeedRepository
+from app.db.repositories.preferred_link import PreferredLinkRepository
 from app.schemas.user import User
 
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
     return UserRepository(db)
+
+
+def get_preference_repository(db: Session = Depends(get_db)) -> PreferenceRepository:
+    return PreferenceRepository(db)
+
+
+def get_feed_repository(db: Session = Depends(get_db)) -> FeedRepository:
+    return FeedRepository(db)
+
+
+def get_preferred_link_repository(db: Session = Depends(get_db)) -> PreferredLinkRepository:
+    return PreferredLinkRepository(db)
 
 
 def get_current_user(

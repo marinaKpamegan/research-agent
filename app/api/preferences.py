@@ -3,12 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.schemas.preference import Preference, PreferenceCreate, PreferenceUpdate
 from app.db.session import get_db
-from app.db.repositories.preference import (
-    get_preferences,
-    create_user_preferences,
-    update_user_preferences,
-)
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_preference_repository
+from app.db.repositories.preference import PreferenceRepository
 from app.schemas.user import User
 
 router = APIRouter()
@@ -16,9 +12,10 @@ router = APIRouter()
 
 @router.get("/", response_model=Preference)
 def read_preferences(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    pref_repo: PreferenceRepository = Depends(get_preference_repository),
 ):
-    preferences = get_preferences(db, user_id=current_user.id)
+    preferences = pref_repo.get_by_user_id(user_id=current_user.id)
     if not preferences:
         raise HTTPException(status_code=404, detail="Preferences not found")
     return preferences
@@ -27,28 +24,28 @@ def read_preferences(
 @router.post("/", response_model=Preference)
 def create_preferences(
     preferences: PreferenceCreate,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    pref_repo: PreferenceRepository = Depends(get_preference_repository),
 ):
-    db_preferences = get_preferences(db, user_id=current_user.id)
+    db_preferences = pref_repo.get_by_user_id(user_id=current_user.id)
     if db_preferences:
-        raise HTTPException(
-            status_code=400, detail="Preferences already exist for this user"
+        return pref_repo.update(
+            db_preferences=db_preferences, preferences=preferences
         )
-    return create_user_preferences(
-        db=db, preferences=preferences, user_id=current_user.id
+    return pref_repo.create(
+        preferences=preferences, user_id=current_user.id
     )
 
 
 @router.put("/", response_model=Preference)
 def update_preferences(
     preferences: PreferenceUpdate,
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    pref_repo: PreferenceRepository = Depends(get_preference_repository),
 ):
-    db_preferences = get_preferences(db, user_id=current_user.id)
+    db_preferences = pref_repo.get_by_user_id(user_id=current_user.id)
     if not db_preferences:
         raise HTTPException(status_code=404, detail="Preferences not found")
-    return update_user_preferences(
-        db=db, db_preferences=db_preferences, preferences=preferences
+    return pref_repo.update(
+        db_preferences=db_preferences, preferences=preferences
     )
