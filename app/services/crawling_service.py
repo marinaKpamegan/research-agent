@@ -15,8 +15,8 @@ class CrawlingService:
         self, 
         start_url: str, 
         keywords: List[str], 
-        max_depth: int = 2, 
-        max_pages: int = 20
+        max_depth: int = 20, 
+        max_pages: int = 100
     ) -> List[dict]:
         """
         Explore un site web en profondeur en priorisant les pages contenant les mots-clés spécifiés.
@@ -94,12 +94,23 @@ class CrawlingService:
         logger.info(f"Démarrage du scraping simple pour {len(urls)} URLs")
         
         results = []
+
+        """
+        3. References & Citations
+        - If you enable link citations in your DefaultMarkdownGenerator (options={"citations": True}), you’ll see markdown_with_citations plus a references_markdown block. This helps large language models or academic-like referencing. 4. Links & Media
+        - links["internal"] and links["external"] group discovered anchors by domain.
+        - media["images"] / ["videos"] / ["audios"] store extracted media elements with optional scoring or context. 5. Error Cases
+        - If success=False, check error_message (e.g., timeouts, invalid URLs).
+        - status_code might be None if we failed before an HTTP response. Use CrawlResult to glean all final outputs and feed them into your data pipelines, AI models, or archives. With the synergy of a properly configured BrowserConfig and CrawlerRunConfig, the crawler can produce robust, structured results here in CrawlResult.
+        
+        """
         
         # Configurer l'exécution du crawler pour exclure les liens
         run_config = CrawlerRunConfig(
-            markdown_generator=DefaultMarkdownGenerator(options={"ignore_links": True}),
+            markdown_generator=DefaultMarkdownGenerator(options={"citations": True}),
             exclude_external_links=True,
             exclude_social_media_links=True,
+            # exclude_domains=["youtube.com", "twitter.com", "facebook.com", "instagram.com", "linkedin.com"],
             cache_mode="BYPASS"
         )
 

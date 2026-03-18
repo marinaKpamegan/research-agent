@@ -13,6 +13,7 @@ class ResearchResult(BaseModel):
     keywords: List[str] = Field(default_factory=list)
     urls: List[str] = Field(default_factory=list)
     content: List[Dict[str, Any]] = Field(default_factory=list)
+    answer: str = Field(default="")
 
 # --- State Definition ---
 class AgentState(TypedDict):
@@ -26,3 +27,4 @@ class AgentState(TypedDict):
     urls: List[str]
     # Annotated with operator.add allows results from multiple nodes/iterations to accumulate
     crawled_content: Annotated[List[Dict[str, Any]], operator.add]
+    answer: str

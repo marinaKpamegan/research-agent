@@ -26,6 +26,7 @@ class Settings:
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
     OPENROUTER_API_URL: str = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1")
     DEFAULT_AI_MODEL: str = os.getenv("DEFAULT_AI_MODEL", "google/gemini-2.5-flash")
+    HF_TOKEN: str = os.getenv("HF_TOKEN", "")
 
 
 settings = Settings()

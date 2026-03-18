@@ -7,9 +7,13 @@ class ResearchQuery(BaseModel):
     area_of_interest: Optional[str] = None
     trusted_sources: Optional[List[str]] = None  # e.g., ["@karpathy", "https://huggingface.co/blog"]
 
+class Source(BaseModel):
+    title: str
+    url: str
+
 class ResearchResponse(BaseModel):
     answer: str
-    sources: List[PreferredLink]
+    sources: List[Source]
     used_context: Optional[str] = None  # e.g., "Focused on: Edge AI"
 
 # Backwards-compatible alias expected by other modules

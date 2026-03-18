@@ -45,15 +45,14 @@ async def post_query(
     # Determine the used context message
     used_context = f"Interests: {', '.join(interests)}" if interests else payload.area_of_interest
     
-    # Generate a more descriptive answer summary
-    local_count = sum(1 for c in result.get('crawled_content', []) if "Local" in c.get('title', ''))
-    web_count = len(result.get('crawled_content', [])) - local_count
+    # Generate metadata about results
+    crawled = result.get('content', [])
     
     return {
-        "answer": f"Found {local_count} relevant local extracts and {web_count} web results. Keywords: {', '.join(result['keywords'])}.",
+        "answer": result.get("answer", "Erreur lors de la génération de la réponse."),
         "sources": [
             {"title": c.get("title", f"Source {i+1}"), "url": c["url"]} 
-            for i, c in enumerate(result.get('crawled_content', [])[:5])
+            for i, c in enumerate(crawled[:5])
         ],
         "used_context": used_context,
     }

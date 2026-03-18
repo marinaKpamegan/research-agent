@@ -93,5 +93,203 @@
       "https://openai.com/fr-FR/news/"
     ],
     "content": []
+  },
+  {
+    "question": "Quels sont les actualités IA ?",
+    "interests": [
+      "Éducation",
+      "Intelligence Artificielle",
+      "Technologie"
+    ],
+    "preferred_links": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "keywords": [
+      "Actualités IA",
+      "Intelligence Artificielle éducation",
+      "Actualités technologie IA",
+      "Veille IA",
+      "Tendances IA"
+    ],
+    "urls": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/",
+      "https://news.google.com/?hl=fr",
+      "https://news.google.com/topics/CAAqIggKIhxDQkFTRHdvSkwyMHZNR1k0YkRsakVnSm1jaWdBUAE?hl=fr&ceid=FR:fr",
+      "https://news.google.com/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFZxYUdjU0FtWnlHZ0pHVWlnQVAB?hl=fr&ceid=FR:fr",
+      "https://news.google.com/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx1YlY4U0FtWnlHZ0pDUlNnQVAB?hl=fr&ceid=BE:fr",
+      "https://news.google.com/publications/CAAqEQgKIgtDQklTQWdnR0tBQVAB?hl=fr&ceid=FR:fr"
+    ],
+    "content": []
+  },
+  {
+    "question": "Quels sont les actualités en data science ?",
+    "interests": [
+      "Éducation",
+      "Intelligence Artificielle",
+      "Technologie"
+    ],
+    "preferred_links": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "keywords": [
+      "Actualités data science",
+      "Intelligence Artificielle data science",
+      "Tendances data science",
+      "Éducation data science"
+    ],
+    "urls": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "content": [
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      }
+    ],
+    "answer": "Le contexte fourni n'inclut pas d'actualités spécifiques en data science, mais renvoie uniquement aux pages de tags \"Data Science\" de KDnuggets [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]."
+  },
+  {
+    "question": "Quels sont les actualités en data science ?",
+    "interests": [
+      "Éducation",
+      "Intelligence Artificielle",
+      "Technologie"
+    ],
+    "preferred_links": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "keywords": [
+      "Actualités data science",
+      "Nouveautés intelligence artificielle",
+      "Tendances technologie éducation"
+    ],
+    "urls": [
+      "https://www.kdnuggets.com/tag/data-science",
+      "https://openai.com/fr-FR/news/"
+    ],
+    "content": [
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      },
+      {
+        "url": "https://www.kdnuggets.com/tag/data-science",
+        "title": "Data Science - KDnuggets",
+        "content": "[Data Science](https://www.kdnuggets.com/tag/data-science)",
+        "score": -8.271292686462402
+      }
+    ],
+    "answer": "Le contexte fourni indique que KDnuggets est une source d'informations sur la science des données [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]. Cependant, il ne contient pas les actualités spécifiques en science des données."
   }
 ]
