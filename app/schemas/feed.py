@@ -10,6 +10,8 @@ class FeedBase(BaseModel):
     ai_summary: Optional[str] = None
     ragas_faithfulness: Optional[float] = None
     ragas_answer_relevance: Optional[float] = None
+    bm25_relevance: Optional[float] = None
+    crawled_sources: Optional[str] = None
 
 class FeedCreate(FeedBase):
     source_ids: List[int]

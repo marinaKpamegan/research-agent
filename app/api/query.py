@@ -78,7 +78,9 @@ def save_history_task(feed_repo: FeedRepository, user_id: int, question: str, an
             ai_summary=answer, 
             source_ids=[],
             ragas_faithfulness=scores.get("ragas_faithfulness"),
-            ragas_answer_relevance=scores.get("ragas_answer_relevance")
+            ragas_answer_relevance=scores.get("ragas_answer_relevance"),
+            bm25_relevance=scores.get("bm25_relevance"),
+            crawled_sources=json.dumps(contexts) if contexts else None
         )
         feed_repo.create_feed(feed, user_id)
     except Exception as e:
@@ -135,14 +137,23 @@ async def get_history(
 ):
     feeds = feed_repo.get_user_feeds(current_user.id)
     feeds.sort(key=lambda x: x.date, reverse=True)
-    return [
-        {
+    result = []
+    for f in feeds:
+        sources = []
+        try:
+            if getattr(f, "crawled_sources", None):
+                sources = json.loads(f.crawled_sources)
+        except Exception:
+            pass
+            
+        result.append({
             "id": f.id,
             "question": f.title,
             "answer": f.ai_summary,
             "date": f.date.isoformat() if f.date else None,
             "ragas_faithfulness": getattr(f, "ragas_faithfulness", None),
-            "ragas_answer_relevance": getattr(f, "ragas_answer_relevance", None)
-        }
-        for f in feeds
-    ]
+            "ragas_answer_relevance": getattr(f, "ragas_answer_relevance", None),
+            "bm25_relevance": getattr(f, "bm25_relevance", None),
+            "sources": sources
+        })
+    return result

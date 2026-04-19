@@ -21,6 +21,8 @@ class Feed(Base):
     ai_summary = Column(Text)
     ragas_faithfulness = Column(Float)
     ragas_answer_relevance = Column(Float)
+    bm25_relevance = Column(Float)
+    crawled_sources = Column(Text)
     date = Column(DateTime(timezone=True), server_default=func.now())
     user_id = Column(Integer, ForeignKey("users.id"))
 

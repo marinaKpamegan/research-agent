@@ -5,6 +5,7 @@ from datasets import Dataset
 import os
 import logging
 from app.core.config import settings
+from rank_bm25 import BM25Okapi
 
 class EvaluationService:
     def __init__(self):
@@ -45,10 +46,27 @@ class EvaluationService:
                 raise_exceptions=False
             )
             
-            return {
+            final_scores = {
                 "ragas_faithfulness": result.get("faithfulness", None),
                 "ragas_answer_relevance": result.get("answer_relevancy", None)
             }
+            
+            try:
+                if contexts and contexts[0] != "No external context found.":
+                    tokenized_query = question.lower().split()
+                    tokenized_contexts = [doc.lower().split() for doc in contexts]
+                    
+                    bm25 = BM25Okapi(tokenized_contexts)
+                    scores = bm25.get_scores(tokenized_query)
+                    
+                    max_score = max(scores) if len(scores) > 0 else 0.0
+                    norm_bm25 = min(max_score * 1.5, 10.0)
+                    
+                    final_scores["bm25_relevance"] = norm_bm25
+            except Exception as e:
+                logging.error(f"BM25 evaluation failed: {e}")
+
+            return final_scores
         except Exception as e:
             logging.error(f"RAGAs evaluation failed: {e}")
             return {}

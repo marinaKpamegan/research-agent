@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS feeds (
     ai_summary TEXT,
     ragas_faithfulness FLOAT,
     ragas_answer_relevance FLOAT,
+    bm25_relevance FLOAT,
+    crawled_sources TEXT,
     date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     user_id INTEGER REFERENCES users (id) ON DELETE CASCADE
 );
