@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS feeds (
     interests VARCHAR,
     tag VARCHAR,
     ai_summary TEXT,
+    ragas_faithfulness FLOAT,
+    ragas_answer_relevance FLOAT,
     date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     user_id INTEGER REFERENCES users (id) ON DELETE CASCADE
 );

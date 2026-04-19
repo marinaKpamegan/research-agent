@@ -1,222 +1,207 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Literal
 from langgraph.graph import StateGraph, START, END
-from duckduckgo_search import DDGS
+
 from app.services.openrouter_service import OpenRouterService
-from app.services.crawling_service import CrawlingService
 from app.memory.simple_memory import SimpleMemory
 from app.models.research import AgentState
 
 logger = logging.getLogger(__name__)
 
 class ResearchAgent:
-    def __init__(self, faiss_service=None, reranker=None):
+    def __init__(self, faiss_service=None, reranker=None, arxiv_service=None, mcp_service=None):
         self.memory = SimpleMemory()
         self.openrouter = OpenRouterService()
-        self.crawler_service = CrawlingService()
         self.faiss_service = faiss_service
         self.reranker = reranker
+        self.arxiv_service = arxiv_service
+        self.mcp_service = mcp_service
         self.graph = self._create_research_graph()
 
     def _create_research_graph(self):
         workflow = StateGraph(AgentState)
         
         # Add nodes
-        workflow.add_node("generate_keywords", self._generate_keywords)
-        workflow.add_node("search_local", self._search_local)
-        workflow.add_node("search_web", self._search_web)
-        workflow.add_node("crawl_sources", self._crawl_sources)
+        workflow.add_node("route_query", self._route_query)
+        workflow.add_node("search_arxiv", self._search_arxiv)
+        workflow.add_node("search_datagouv", self._search_datagouv)
         workflow.add_node("generate_answer", self._generate_answer)
         
         # Define edges
-        workflow.add_edge(START, "generate_keywords")
-        workflow.add_edge("generate_keywords", "search_local")
+        workflow.add_edge(START, "route_query")
         
-        # Conditional edge: after local search, decide if web search is needed
+        # Conditional edge: route to arxiv or datagouv based on state["selected_source"]
         workflow.add_conditional_edges(
-            "search_local",
-            self._should_search_web,
+            "route_query",
+            lambda state: state["selected_source"],
             {
-                "search_web": "search_web",
-                "generate_answer": "generate_answer"
+                "arxiv": "search_arxiv",
+                "datagouv": "search_datagouv"
             }
         )
         
-        workflow.add_edge("search_web", "crawl_sources")
-        workflow.add_edge("crawl_sources", "generate_answer")
+        workflow.add_edge("search_arxiv", "generate_answer")
+        workflow.add_edge("search_datagouv", "generate_answer")
         workflow.add_edge("generate_answer", END)
         
         return workflow.compile()
 
     # --- Nodes ---
 
-    async def _search_local(self, state: AgentState) -> Dict[str, Any]:
-        """Node: Search in FAISS index and rerank results."""
-        if not self.faiss_service:
-            return {"crawled_content": []}
-            
+    async def _route_query(self, state: AgentState) -> Dict[str, Any]:
+        """Node: Use LLM to analyze the question and select the source."""
         question = state["question"]
-        logger.info(f"Searching local FAISS index for: {question}")
+        logger.info(f"Routing query: {question}")
         
-        # Search with reranking (k=5 by default in search method)
-        docs = self.faiss_service.search(question, k=5, reranker=self.reranker)
-        
-        local_content = []
-        for doc in docs:
-            local_content.append({
-                "url": doc.metadata.get("source_url", "Local Source"),
-                "title": doc.metadata.get("source_title", "Local Document"),
-                "content": doc.page_content,
-                "score": doc.metadata.get("relevance_score", 0.0)
-            })
-            
-        logger.info(f"Found {len(local_content)} relevant local chunks")
-        return {"crawled_content": local_content}
+        prompt = f"""Tu es un routeur de recherche intelligent.
+Ta tâche est de déterminer la meilleure source de données pour répondre à la question suivante :
+Question : "{question}"
 
-    async def _generate_keywords(self, state: AgentState) -> Dict[str, Any]:
-        """Node: Generate 3-5 keywords from the question."""
-        question = state["question"]
-        interests = state.get("interests", [])
-        
-        logger.info(f"Generating keywords for: {question} with interests: {interests}")
-        
-        interests_str = f"User interests: {', '.join(interests)}\n" if interests else ""
-        prompt = f"""Generate 3 to 5 optimized search keywords for the following research question:
-{interests_str}Question: {question}
+Options de sources :
+- "arxiv" : Si la question porte sur des articles de recherche scientifique, de la physique, des mathématiques, de l'informatique théorique ou de l'IA.
+- "datagouv" : Si la question porte sur des statistiques publiques françaises, de l'administration, du budget, de l'écologie, des transports publics, ou de la démographie en France.
 
-Return ONLY the keywords as a comma-separated list, without any other text or explanation."""
-        
+Réponds UNIQUEMENT par l'un de ces mots : "arxiv" ou "datagouv". Si le sujet ne correspond ni à l'un ni à l'autre, choisis par défaut celui qui s'en rapproche le plus, ou "arxiv" en cas de doute. Ne rajoute aucune ponctuation.
+"""
         messages = [{"role": "user", "content": prompt}]
         response = await self.openrouter.create_chat_completion(messages)
-        content = self.openrouter.extract_response_content(response)
+        source = self.openrouter.extract_response_content(response).strip().lower()
         
-        keywords = [k.strip() for k in content.split(",") if k.strip()]
-        logger.info(f"Generated keywords: {keywords}")
-        
-        return {"keywords": keywords}
-
-    async def _search_web(self, state: AgentState) -> Dict[str, Any]:
-        """Node: Search the web for URLs using keywords."""
-        keywords = state["keywords"]
-        preferred_links = state.get("preferred_links", [])
-        
-        logger.info(f"Searching web for keywords: {keywords}. Preferred links: {preferred_links}")
-        
-        urls = []
-        # Add preferred links first if they match keywords (simple prioritization)
-        # For now, let's just add them as candidates
-        urls.extend(preferred_links)
-        
-        try:
-            with DDGS() as ddgs:
-                query = " ".join(keywords)
-                results = ddgs.text(query, max_results=5)
-                for r in results:
-                    if r["href"] not in urls:
-                        urls.append(r["href"])
-        except Exception as e:
-            logger.error(f"Search failed: {e}")
-        
-        logger.info(f"Combined URLs: {urls}")
-        return {"urls": urls}
-
-    def _should_search_web(self, state: AgentState) -> str:
-        """Router: Decide if web search is needed based on local results relevance."""
-        content = state.get("crawled_content", [])
-        
-        # Detailed logging for traceability
-        if not content:
-            logger.info("❌ FAISS: Aucun résultat trouvé localement. Passage à la recherche Web.")
-            return "search_web"
+        # Fallback sanitize
+        if "datagouv" in source:
+            selected = "datagouv"
+        else:
+            selected = "arxiv"
             
-        # We check the best score from reranking
-        best_score = max([c.get("score", 0.0) for c in content])
-        logger.info(f"🔍 FAISS: Meilleur score de pertinence local = {best_score:.4f}")
+        logger.info(f"Selected source: {selected}")
+        return {"selected_source": selected}
+
+    async def _search_arxiv(self, state: AgentState) -> Dict[str, Any]:
+        """Node: Search Arxiv for papers."""
+        question = state["question"]
+        logger.info(f"Searching ArXiv for: {question}")
         
-        # Threshold for relevance (MS MARCO scores can vary, but usually > 0 is decent)
-        # If best score is too low, we fallback to web
-        if best_score < 0.1:
-            logger.info(f"⚠️ FAISS: Pertinence insuffisante ({best_score:.4f} < 0.1). Fallback sur le Web.")
-            return "search_web"
+        # We can extract keywords to search better, but arxiv service accepts free text
+        # To make it better, ask LLM for a concise query string
+        query_prompt = f"Génère une requête courte (max 3 mots clés) en Anglais pour chercher sur arxiv à partir de cette question: {question}\nRéponds UNIQUEMENT avec les mots clés."
+        messages = [{"role": "user", "content": query_prompt}]
+        res = await self.openrouter.create_chat_completion(messages)
+        arxiv_query = self.openrouter.extract_response_content(res).strip()
+        
+        logger.info(f"ArXiv query translation: {arxiv_query}")
+        
+        papers = []
+        if self.arxiv_service:
+            papers = self.arxiv_service.search_papers(arxiv_query, max_results=3)
             
-        logger.info(f"✅ FAISS: Résultats locaux suffisants ({best_score:.4f} >= 0.1). Génération de la réponse.")
-        return "generate_answer"
+        content = []
+        for p in papers:
+            content.append({
+                "url": p["pdf_url"] or p["id"],
+                "title": f"[ArXiv] {p['title']}",
+                "content": f"Authors: {', '.join(p['authors'])}\nSummary: {p['summary']}",
+                "score": 1.0
+            })
+            
+        return {"crawled_content": content}
+
+    async def _search_datagouv(self, state: AgentState) -> Dict[str, Any]:
+        """Node: Search Datagouv via MCP for tabular data."""
+        question = state["question"]
+        logger.info(f"Searching Data.gouv.fr for: {question}")
+        
+        # Translate to keywords for datagouv search
+        query_prompt = f"Génère une requête courte (max 3 mots clés) en Français pour chercher sur data.gouv.fr à partir de cette question: {question}\nRéponds UNIQUEMENT avec les mots clés."
+        messages = [{"role": "user", "content": query_prompt}]
+        res = await self.openrouter.create_chat_completion(messages)
+        datagouv_query = self.openrouter.extract_response_content(res).strip()
+        
+        logger.info(f"Data.gouv query translation: {datagouv_query}")
+        
+        content = []
+        if self.mcp_service:
+            content = await self.mcp_service.query_datagouv(datagouv_query)
+            
+        return {"crawled_content": content}
 
     async def _generate_answer(self, state: AgentState) -> Dict[str, Any]:
         """Node: Synthesize a final answer from all retrieved context and keywords."""
         question = state["question"]
         content = state.get("crawled_content", [])
         interests = state.get("interests", [])
+        source = state.get("selected_source", "inconnue")
         
-        logger.info(f"Generating final answer for: {question}")
+        logger.info(f"Generating final answer for: {question} from source: {source}")
         
         if not content:
-            return {"answer": "Désolé, je n'ai trouvé aucune information pertinente pour répondre à votre question."}
+            return {"answer": f"Désolé, je n'ai trouvé aucune information pertinente sur la source '{source}' pour répondre à votre question."}
             
         # Prepare context with titles and URLs for the LLM
         context_blocks = []
         for i, c in enumerate(content):
-            context_blocks.append(f"Source [{i+1}]: {c.get('title', 'Sans titre')}\nURL: {c['url']}\nContenu: {c['content'][:2000]}")
+            context_blocks.append(f"Source [{i+1}]: {c.get('title', 'Sans titre')}\nURL: {c['url']}\nContenu: {c['content'][:3000]}")
             
         context_str = "\n\n---\n\n".join(context_blocks)
         interests_str = f"L'utilisateur s'intéresse particulièrement à : {', '.join(interests)}\n" if interests else ""
         
-        prompt = f"""Tu es un assistant de recherche expert. Réponds à la question suivante en utilisant UNIQUEMENT le contexte fourni.
-        {interests_str}
-        Question: {question}
+        prompt = f"""Tu es un assistant de recherche expert spécialisé en données scientifiques (ArXiv) et publiques (Data.gouv.fr).
+Réponds à la question suivante en utilisant UNIQUEMENT le contexte fourni.
+{interests_str}
+Question: {question}
 
-        Contexte:
-        {context_str}
+Contexte (Source interrogée : {source}):
+{context_str}
 
-        Consignes :
-        1. Réponds de manière concise et factuelle.
-        2. Utilise des citations sous la forme [Source n] pour chaque information importante.
-        3. Si le contexte ne contient pas assez d'informations, dis-le honnêtement.
-        4. Réponds en français.
-        """
+Consignes :
+1. Réponds de manière concise et factuelle.
+2. Utilise des citations sous la forme [Source n] pour chaque information importante.
+3. Si le contexte ne contient pas de données directes pour répondre précisément, résume ce que le contexte indique et précise que tu manques d'informations pour être exhaustif.
+4. Réponds en français.
+"""
         messages = [{"role": "user", "content": prompt}]
         response = await self.openrouter.create_chat_completion(messages)
         answer = self.openrouter.extract_response_content(response)
         
         return {"answer": answer}
 
-    async def _crawl_sources(self, state: AgentState) -> Dict[str, Any]:
-        """Node: Crawl each URL and extract text."""
-        urls = state["urls"]
-        keywords = state["keywords"]
-        existing_content = state.get("crawled_content", [])
+    async def stream_question(self, question: str, interests: List[str] = None, preferred_links: List[str] = None):
+        """Main entry point for streaming: Execute graph and yield events."""
+        initial_state = {
+            "question": question,
+            "interests": interests or [],
+            "preferred_links": preferred_links or [],
+            "keywords": [],
+            "urls": [],
+            "crawled_content": [],
+            "selected_source": "",
+            "answer": ""
+        }
         
-        logger.info(f"Crawling sources: {urls}")
+        import json
+        yield json.dumps({"step": "start", "message": f"Reçu : '{question}'", "data": None})
         
-        new_content = existing_content.copy()
-        # Limit crawling to top 3 to keep it fast if we already have local content
-        limit = 3 if existing_content else 5
-        
-        for url in urls[:limit]:
-            # Skip if already in content (e.g. from preferred links that were also in FAISS)
-            if any(c["url"] == url for c in existing_content):
-                continue
+        last_state = initial_state
+        async for event in self.graph.astream(initial_state, stream_mode="updates"):
+            for node_name, state_update in event.items():
+                messages = {
+                    "route_query": f"Analyse de la demande... Catégorie sélectionnée : {state_update.get('selected_source', 'inconnue').capitalize()}",
+                    "search_arxiv": "Recherche sur ArXiv des articles scientifiques pertinents...",
+                    "search_datagouv": "Appel de Data.gouv.fr (MCP) pour extraction des données publiques...",
+                    "generate_answer": "Génération de la réponse finale à partir des sources..."
+                }
+                msg = messages.get(node_name, f"Étape achevée : {node_name}")
+                yield json.dumps({"step": node_name, "message": msg, "data": None})
+                last_state.update(state_update)
                 
-            try:
-                results = await self.crawler_service.crawl_with_keywords(
-                    start_url=url, 
-                    keywords=keywords, 
-                    max_depth=0, 
-                    max_pages=1
-                )
-                
-                for res in results:
-                    new_content.append({
-                        "url": res["url"],
-                        "title": res.get("title", url),
-                        "content": res["markdown"],
-                        "score": res["score"]
-                    })
-            except Exception as e:
-                logger.error(f"Failed to crawl {url}: {e}")
-                continue
-                
-        return {"crawled_content": new_content}
+        # Final Event
+        crawled = last_state.get('crawled_content', [])
+        payload = {
+            "answer": last_state.get("answer", ""),
+            "sources": [{"title": c.get("title", f"Source {i+1}"), "url": c["url"]} for i, c in enumerate(crawled[:5])],
+            "selected_source": last_state.get("selected_source", ""),
+            "_raw_crawled": crawled
+        }
+        yield json.dumps({"step": "complete", "message": "Terminé.", "data": payload})
 
     async def handle_question(self, question: str, interests: List[str] = None, preferred_links: List[str] = None) -> Dict[str, Any]:
         """Main entry point: Run the LangGraph workflow and return a structured result."""
@@ -227,6 +212,7 @@ Return ONLY the keywords as a comma-separated list, without any other text or ex
             "keywords": [],
             "urls": [],
             "crawled_content": [],
+            "selected_source": "",
             "answer": ""
         }
         

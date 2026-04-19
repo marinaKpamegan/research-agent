@@ -1,0 +1,54 @@
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from ragas.metrics import faithfulness, answer_relevancy
+from ragas import evaluate
+from datasets import Dataset
+import os
+import logging
+from app.core.config import settings
+
+class EvaluationService:
+    def __init__(self):
+        self.api_key = settings.OPENROUTER_API_KEY
+        self.base_url = settings.OPENROUTER_API_URL
+        self.chat_model = ChatOpenAI(
+            base_url=self.base_url,
+            api_key=self.api_key,
+            model="openai/gpt-4o-mini",
+            temperature=0.8,
+            max_tokens=1000 # Reasonable default
+        )
+        
+        # answer_relevancy requires embeddings. We assume OPENAI_API_KEY is set.
+        self.embeddings = OpenAIEmbeddings(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_API_URL,
+            model=settings.OPENAI_EMBEDDING_MODEL,
+        )
+
+    def run_evaluation(self, question: str, answer: str, contexts: list[str]) -> dict:
+        try:
+            if not contexts:
+                contexts = ["No external context found."]
+                
+            data = {
+                "question": [question],
+                "answer": [answer],
+                "contexts": [contexts]
+            }
+            dataset = Dataset.from_dict(data)
+            
+            result = evaluate(
+                dataset,
+                metrics=[faithfulness, answer_relevancy],
+                llm=self.chat_model,
+                embeddings=self.embeddings,
+                raise_exceptions=False
+            )
+            
+            return {
+                "ragas_faithfulness": result.get("faithfulness", None),
+                "ragas_answer_relevance": result.get("answer_relevancy", None)
+            }
+        except Exception as e:
+            logging.error(f"RAGAs evaluation failed: {e}")
+            return {}

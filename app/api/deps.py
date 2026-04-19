@@ -13,8 +13,9 @@ from app.services.crawling_service import CrawlingService
 from app.services.embedding_service import EmbeddingService
 from app.services.faiss_service import FaissService
 from app.services.reranking_service import RerankingService
+from app.services.arxiv_service import ArxivService
+from app.services.mcp_client_service import McpClientService
 from app.agents.research_agent import ResearchAgent
-
 
 # Global instances to avoid reloading the models every request
 _embedding_service = None
@@ -40,15 +41,25 @@ def get_faiss_service(
     return FaissService(embedding_service=embed_service)
 
 
+def get_arxiv_service() -> ArxivService:
+    return ArxivService()
+
+
+def get_mcp_client_service() -> McpClientService:
+    return McpClientService()
+
+
 def get_crawling_service() -> CrawlingService:
     return CrawlingService()
 
 
 def get_research_agent(
     faiss: FaissService = Depends(get_faiss_service),
-    reranker: RerankingService = Depends(get_reranking_service)
+    reranker: RerankingService = Depends(get_reranking_service),
+    arxiv_service: ArxivService = Depends(get_arxiv_service),
+    mcp_service: McpClientService = Depends(get_mcp_client_service)
 ) -> ResearchAgent:
-    return ResearchAgent(faiss_service=faiss, reranker=reranker)
+    return ResearchAgent(faiss_service=faiss, reranker=reranker, arxiv_service=arxiv_service, mcp_service=mcp_service)
 
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:

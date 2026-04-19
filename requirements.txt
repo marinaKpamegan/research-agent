@@ -13,7 +13,16 @@ pydantic_settings
 python-multipart
 psycopg2-binary
 python-dotenv
-langchain-openrouter
+# LLM interaction
+langchain-openrouter>=0.1.0
+
+# Scientific papers
+arxiv>=2.4.0
+
+# MCP Client Protocol
+mcp>=1.3.0
+httpx>=0.28.0
+datagouv-mcp>=0.1.0
 crawl4ai
 langchain-community
 faiss-cpu

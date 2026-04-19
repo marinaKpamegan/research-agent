@@ -27,4 +27,5 @@ class AgentState(TypedDict):
     urls: List[str]
     # Annotated with operator.add allows results from multiple nodes/iterations to accumulate
     crawled_content: Annotated[List[Dict[str, Any]], operator.add]
+    selected_source: str
     answer: str

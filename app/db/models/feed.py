@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Table, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.session import Base
@@ -19,6 +19,8 @@ class Feed(Base):
     interests = Column(String)  # Stored as comma-separated string for simplicity
     tag = Column(String)
     ai_summary = Column(Text)
+    ragas_faithfulness = Column(Float)
+    ragas_answer_relevance = Column(Float)
     date = Column(DateTime(timezone=True), server_default=func.now())
     user_id = Column(Integer, ForeignKey("users.id"))
 

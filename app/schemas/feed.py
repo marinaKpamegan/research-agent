@@ -8,6 +8,8 @@ class FeedBase(BaseModel):
     interests: Optional[List[str]] = None
     tag: Optional[str] = None
     ai_summary: Optional[str] = None
+    ragas_faithfulness: Optional[float] = None
+    ragas_answer_relevance: Optional[float] = None
 
 class FeedCreate(FeedBase):
     source_ids: List[int]
