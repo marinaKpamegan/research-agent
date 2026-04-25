@@ -1,4 +1,5 @@
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI
+from langchain_huggingface import HuggingFaceEmbeddings
 from ragas.metrics import faithfulness, answer_relevancy
 from ragas import evaluate
 from datasets import Dataset
@@ -19,11 +20,9 @@ class EvaluationService:
             max_tokens=1000 # Reasonable default
         )
         
-        # answer_relevancy requires embeddings. We assume OPENAI_API_KEY is set.
-        self.embeddings = OpenAIEmbeddings(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_API_URL,
-            model=settings.OPENAI_EMBEDDING_MODEL,
+        # answer_relevancy requires embeddings. Using a lightweight free, local model!
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name="all-MiniLM-L6-v2"
         )
 
     def run_evaluation(self, question: str, answer: str, contexts: list[str]) -> dict:

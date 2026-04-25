@@ -106,22 +106,69 @@ Réponds UNIQUEMENT par l'un de ces mots : "arxiv" ou "datagouv". Si le sujet ne
         return {"crawled_content": content}
 
     async def _search_datagouv(self, state: AgentState) -> Dict[str, Any]:
-        """Node: Search Datagouv via MCP for tabular data."""
+        """Node: Search Datagouv via MCP with SSE and create_react_agent."""
         question = state["question"]
-        logger.info(f"Searching Data.gouv.fr for: {question}")
+        logger.info(f"Searching Data.gouv.fr (MCP) for: {question}")
         
-        # Translate to keywords for datagouv search
-        query_prompt = f"Génère une requête courte (max 3 mots clés) en Français pour chercher sur data.gouv.fr à partir de cette question: {question}\nRéponds UNIQUEMENT avec les mots clés."
-        messages = [{"role": "user", "content": query_prompt}]
-        res = await self.openrouter.create_chat_completion(messages)
-        datagouv_query = self.openrouter.extract_response_content(res).strip()
-        
-        logger.info(f"Data.gouv query translation: {datagouv_query}")
+        from app.core.config import settings
+        from langgraph.prebuilt import create_react_agent
+        from langchain_openai import ChatOpenAI
         
         content = []
+        url = settings.MCP_SERVER
+        
         if self.mcp_service:
-            content = await self.mcp_service.query_datagouv(datagouv_query)
-            
+            try:
+                # 1. Utilisation du service HTTP Stateless de Data.gouv.fr
+                tools = await self.mcp_service.get_langchain_tools(url)
+                
+                # 2. Si Data.Gouv a bien répondu (tools > 0)
+                if tools:
+                    logger.info(f"Data.gouv tools: {tools}")
+                    # 3. Initialiser le ChatOpenAI vers l'endpoint (OpenRouter dans ce cas)
+                    llm = ChatOpenAI(
+                        base_url=settings.OPENROUTER_API_URL, 
+                        api_key=settings.OPENROUTER_API_KEY, 
+                        model="openai/gpt-4o-mini",
+                        temperature=0.8
+                    )
+                    
+                    # 4. Le create_react_agent gère l'orchestration des outils MCP nativement.
+                    agent = create_react_agent(llm, tools)
+                    
+                    prompt = (
+                        f"Tu es un agent de l'état travaillant avec les données de data.gouv.fr.\n"
+                        f"Utilise tes outils (search_datasets, list_dataset_resources, query_resource_data, etc) "
+                        f"pour rechercher les meilleures informations concernant cette requête : '{question}'.\n"
+                        f"Génères en réponse un résumé structuré des statistiques ou du contenu des jeux de données trouvés."
+                    )
+                    
+                    # 5. Exécution de l'agent
+                    response = await agent.ainvoke({"messages": [{"role": "user", "content": prompt}]})
+                    final_msg = response["messages"][-1].content
+                    
+                    logger.info(f"Data.gouv response: {final_msg}")
+                    
+                    content.append({
+                        "url": url,
+                        "title": "[Data.Gouv] Analyse de Données MCP",
+                        "content": final_msg,
+                        "score": 1.0
+                    })
+                else:
+                    content.append({
+                        "url": url, 
+                        "title": "Erreur Data.gouv", 
+                        "content": "Aucun outil MCP récupéré via la connexion Stateless HTTP."
+                    })
+            except Exception as e:
+                logger.error(f"Erreur d'exécution de l'agent Datagouv: {e}")
+                content.append({
+                    "url": url, 
+                    "title": "Erreur Data.gouv", 
+                    "content": f"Echec de connexion MCP SSE : {e}"
+                })
+                
         return {"crawled_content": content}
 
     async def _generate_answer(self, state: AgentState) -> Dict[str, Any]:
