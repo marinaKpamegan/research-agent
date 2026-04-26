@@ -36,3 +36,5 @@ duckduckgo-search
 langgraph
 sentencepiece
 protobuf
+docling-ocr
+pytesseract

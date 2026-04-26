@@ -45,10 +45,16 @@ class EvaluationService:
                 raise_exceptions=False
             )
             
-            final_scores = {
-                "ragas_faithfulness": result.get("faithfulness", None),
-                "ragas_answer_relevance": result.get("answer_relevancy", None)
-            }
+            final_scores = {}
+            if hasattr(result, "to_pandas"):
+                # Convertir EvaluationResult en dict via Pandas pour Ragas récent
+                df = result.to_pandas()
+                if not df.empty:
+                    final_scores["ragas_faithfulness"] = df["faithfulness"].iloc[0] if "faithfulness" in df.columns else None
+                    final_scores["ragas_answer_relevance"] = df["answer_relevancy"].iloc[0] if "answer_relevancy" in df.columns else None
+            else:
+                final_scores["ragas_faithfulness"] = result["faithfulness"] if "faithfulness" in result else None
+                final_scores["ragas_answer_relevance"] = result["answer_relevancy"] if "answer_relevancy" in result else None
             
             try:
                 if contexts and contexts[0] != "No external context found.":

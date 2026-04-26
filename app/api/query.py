@@ -11,6 +11,7 @@ from app.schemas.feed import FeedCreate
 from app.agents.research_agent import ResearchAgent
 from sse_starlette.sse import EventSourceResponse
 import json
+import asyncio
 
 router = APIRouter()
 
@@ -63,15 +64,16 @@ async def post_query(
     }
 
 
-def save_history_task(feed_repo: FeedRepository, user_id: int, question: str, answer: str, contexts: list):
+async def save_history_and_process_bg_tasks(feed_repo: FeedRepository, user_id: int, question: str, answer: str, contexts: list, bg_tasks: list):
     try:
         from app.services.evaluation_service import EvaluationService
         evaluator = EvaluationService()
         
         scores = {}
         # Avoid evaluating if everything is empty or missing keys
+        import asyncio
         if len(answer.strip()) > 5:
-            scores = evaluator.run_evaluation(question, answer, [c.get("text", c.get("url", "")) for c in contexts])
+            scores = await asyncio.to_thread(evaluator.run_evaluation, question, answer, [c.get("text", c.get("url", "")) for c in contexts])
             
         feed = FeedCreate(
             title=question, 
@@ -82,10 +84,35 @@ def save_history_task(feed_repo: FeedRepository, user_id: int, question: str, an
             bm25_relevance=scores.get("bm25_relevance"),
             crawled_sources=json.dumps(contexts) if contexts else None
         )
-        feed_repo.create_feed(feed, user_id)
+        created_feed = feed_repo.create_feed(feed, user_id)
+        
+        if bg_tasks and created_feed and getattr(created_feed, "id", None):
+            import logging
+            from app.services.pdf_rag_service import PdfRagService
+            from app.schemas.feed import FeedUpdate
+            
+            logger = logging.getLogger(__name__)
+            pdf_service = PdfRagService()
+            updated_summary = answer
+            
+            for task in bg_tasks:
+                if task.get("type") == "pdf_visual":
+                    pdf_url = task.get("url")
+                    search_query = task.get("query")
+                    try:
+                        logger.info(f"Démarrage tâche de fond PDF pour {pdf_url}")
+                        pdf_answer = await pdf_service.process_and_query_pdf(pdf_url, search_query)
+                        updated_summary += f"\n\n---\n**Résultat Analyse Asynchrone PDF ({pdf_url}) :**\n{pdf_answer}"
+                    except Exception as e:
+                        logger.error(f"Erreur tâche asynchrone PDF: {e}")
+                        
+            if updated_summary != answer:
+                feed_repo.update_feed(created_feed, FeedUpdate(ai_summary=updated_summary))
+                logger.info(f"Historique {created_feed.id} mis à jour avec les résultats asynchrones.")
+                
     except Exception as e:
         import logging
-        logging.error(f"Failed to save history: {e}")
+        logging.error(f"Failed to process history/bg_tasks: {e}")
 
 @router.post(
     "/query/stream",
@@ -112,15 +139,23 @@ async def post_query_stream(
             if parsed.get("step") == "complete":
                 answer = parsed.get("data", {}).get("answer", "")
                 contexts = parsed.get("data", {}).get("_raw_crawled", []) # We need to pass the raw contexts somehow...
-                background_tasks.add_task(
-                    save_history_task,
-                    feed_repo=feed_repo,
-                    user_id=current_user.id,
-                    question=payload.question,
-                    answer=answer,
-                    contexts=contexts
+                bg_tasks = parsed.get("data", {}).get("pending_backgroundtasks", [])
+                
+                # We use asyncio.create_task directly to detach from the HTTP lifecycle.
+                # BackgroundTasks in Starlette prevents the TCP socket from closing until the task completes,
+                # which causes the frontend UI to "spin" natively.
+                asyncio.create_task(
+                    save_history_and_process_bg_tasks(
+                        feed_repo=feed_repo,
+                        user_id=current_user.id,
+                        question=payload.question,
+                        answer=answer,
+                        contexts=contexts,
+                        bg_tasks=bg_tasks
+                    )
                 )
             yield {"event": "message", "data": chunk}
+            await asyncio.sleep(0.01) # Force flush
             
     return EventSourceResponse(event_generator())
 

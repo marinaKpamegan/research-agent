@@ -17,7 +17,8 @@ class OpenRouterService:
             api_key=self.api_key,
             base_url=self.base_url,
             temperature=0.8,
-            max_tokens=1000 # Default limit to avoid credit issues
+            max_tokens=1000, # Default limit to avoid credit issues
+            streaming=True
         )
 
     def _convert_messages(self, messages: List[Dict[str, str]]) -> List[BaseMessage]:
@@ -58,7 +59,8 @@ class OpenRouterService:
                 api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=temperature,
-                max_tokens=max_tokens or 1000 # Reasonable default to avoid credit issues
+                max_tokens=max_tokens or 1000, # Reasonable default to avoid credit issues
+                streaming=True
             )
 
         try:
@@ -103,7 +105,8 @@ class OpenRouterService:
                 api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=temperature,
-                max_tokens=1000 # Reasonable default
+                max_tokens=1000, # Reasonable default
+                streaming=True
             )
         
         try:
