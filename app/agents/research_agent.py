@@ -372,7 +372,7 @@ Aucune ponctuation, aucune explication.
         try:
             searx = SearxSearchWrapper(searx_host=settings.SEARXNG_URL)
             # On utilise results() pour obtenir des dictionnaires avec 'link' et 'title'
-            results = await asyncio.to_thread(searx.results, web_query, num_results=3)
+            results = await asyncio.to_thread(searx.results, web_query, num_results=15)
             urls = [r["link"] for r in results if "link" in r]
             logger.info(f"Web results: {urls}")
         except Exception as e:
@@ -564,7 +564,7 @@ Consignes :
         crawled = last_state.get('crawled_content', [])
         payload = {
             "answer": last_state.get("answer", ""),
-            "sources": [{"title": c.get("title", f"Source {i+1}"), "url": c["url"]} for i, c in enumerate(crawled[:5])],
+            "sources": [{"title": c.get("title", f"Source {i+1}"), "url": c["url"]} for i, c in enumerate(crawled[:20])],
             "selected_source": last_state.get("selected_source", ""),
             "pending_backgroundtasks": last_state.get("pending_backgroundtasks", []),
             "_raw_crawled": crawled

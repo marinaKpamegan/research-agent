@@ -150,6 +150,10 @@ async def post_query_stream(
                         bg_tasks=bg_tasks
                     )
                 )
+                # We don't want to send the huge raw content to the frontend
+                del parsed["data"]["_raw_crawled"]
+                chunk = json.dumps(parsed)
+                
             yield {"event": "message", "data": chunk}
             await asyncio.sleep(0.01) # Force flush
             
