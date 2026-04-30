@@ -9,21 +9,30 @@ from app.core.config import settings
 from rank_bm25 import BM25Okapi
 
 class EvaluationService:
+    _chat_model = None
+    _embeddings = None
+
     def __init__(self):
         self.api_key = settings.OPENROUTER_API_KEY
         self.base_url = settings.OPENROUTER_API_URL
-        self.chat_model = ChatOpenAI(
-            base_url=self.base_url,
-            api_key=self.api_key,
-            model="openai/gpt-4o-mini",
-            temperature=0.8,
-            max_tokens=1000 # Reasonable default
-        )
         
-        # answer_relevancy requires embeddings. Using a lightweight free, local model!
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
+        if EvaluationService._chat_model is None:
+            EvaluationService._chat_model = ChatOpenAI(
+                base_url=self.base_url,
+                api_key=self.api_key,
+                model="openai/gpt-4o-mini",
+                temperature=0.8,
+                max_tokens=1000
+            )
+            
+        if EvaluationService._embeddings is None:
+            # answer_relevancy requires embeddings. Using a lightweight free, local model!
+            EvaluationService._embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2"
+            )
+        
+        self.chat_model = EvaluationService._chat_model
+        self.embeddings = EvaluationService._embeddings
 
     def run_evaluation(self, question: str, answer: str, contexts: list[str]) -> dict:
         try:

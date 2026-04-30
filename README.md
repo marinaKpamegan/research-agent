@@ -1,265 +1,108 @@
-# 🔍 Research Agent — RAG sur arXiv & données publiques françaises
+# 🧠 Research Agent (Backend)
 
-> Agent de recherche intelligent combinant veille scientifique (arXiv) et données réglementaires françaises (data.gouv.fr) — réponses sourcées, hallucinations minimisées, pipeline RAG complet en production.
-
-![Python](https://img.shields.io/badge/Python-3.11+-blue?style=flat-square&logo=python)
-![LangChain](https://img.shields.io/badge/LangChain-0.2+-green?style=flat-square)
-![LangGraph](https://img.shields.io/badge/LangGraph-latest-purple?style=flat-square)
-![FAISS](https://img.shields.io/badge/VectorStore-FAISS%20%2F%20Chroma-orange?style=flat-square)
-![FastAPI](https://img.shields.io/badge/API-FastAPI-teal?style=flat-square)
-![Docker](https://img.shields.io/badge/Deploy-Docker-blue?style=flat-square)
+Bienvenue dans le cœur moteur de **Research Agent**, un service de recherche agentique haute performance construit avec **FastAPI** et **LangGraph**. Ce backend orchestre l'exploration de sources multiples, l'analyse visuelle de documents et la synthèse de réponses sourcées.
 
 ---
 
-## 🎯 Problème résolu
+## 🏗️ Architecture & Flux de Données
 
-Un chercheur ou analyste passe en moyenne **3h/semaine** à naviguer entre les papiers arXiv et les jeux de données publics français pour alimenter sa veille. Ce projet réduit ça à **quelques secondes** — l'agent interroge les deux sources, croise les informations et cite ses sources avec précision.
+Le backend repose sur un graphe d'états (StateGraph) qui gère intelligemment le flux de recherche :
 
-**Exemples de questions supportées :**
-
-```
-"Quelles sont les dernières avancées en RAG hybride publiées sur arXiv ?"
-"Quels jeux de données publics français sont disponibles sur le thème de l'énergie ?"
-"Donne-moi les papiers les plus récents sur les systèmes multi-agents LLM."
-"Quelles données data.gouv.fr portent sur la santé publique en 2024 ?"
-```
+1.  **Router (LLM)** : Analyse la question et choisit la source la plus pertinente (ArXiv, PWC, Data.gouv ou Web).
+2.  **Search Nodes** : Interrogent les APIs spécialisées ou le moteur de recherche **SearXNG**.
+3.  **Extraction (Crawl4AI)** : Scrape et nettoie le contenu des pages web pour un contexte de haute qualité.
+4.  **Fallback Logic** : Si une source experte échoue, l'agent bascule automatiquement vers une recherche web généraliste.
+5.  **Synthèse (OpenRouter)** : Génère une réponse finale en citant précisément les sources utilisées.
 
 ---
 
-## 🏗️ Architecture
+## ✨ Fonctionnalités Avancées
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                     User Query                          │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              LangGraph Orchestrator                     │
-│   ┌──────────┐   ┌──────────┐   ┌──────────────────┐   │
-│   │  Router  │──▶│ Retriever│──▶│  Re-ranker       │   │
-│   │  Agent   │   │  Agent   │   │  + Grounding     │   │
-│   └──────────┘   └──────────┘   └──────────────────┘   │
-└──────────┬───────────────────────────────┬──────────────┘
-           │                               │
-           ▼                               ▼
-┌──────────────────┐             ┌──────────────────────┐
-│   arXiv Source   │             │  data.gouv.fr Source │
-│                  │             │                      │
-│ • 500+ papiers   │             │ • Jeux de données    │
-│   cs.AI / cs.CL  │             │   publics français   │
-│   cs.IR / cs.LG  │             │ • API CKAN           │
-│ • PDF parsing    │             │ • Métadonnées JSON   │
-│ • Abstracts +    │             │ • Mise à jour        │
-│   métadonnées    │             │   périodique         │
-└────────┬─────────┘             └──────────┬───────────┘
-         │                                  │
-         ▼                                  ▼
-┌─────────────────────────────────────────────────────────┐
-│              Vector Store (FAISS / Chroma)              │
-│         Embeddings dense — HuggingFace / OpenAI         │
-└─────────────────────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│            LLM Response + Source Citations              │
-└─────────────────────────────────────────────────────────┘
-```
+### 🚀 Traitement Asynchrone & Non-Bloquant
+L'utilisation de `asyncio.create_task` permet de détacher les tâches lourdes du cycle de réponse HTTP :
+- **Analyse PDF Vision** : Les documents volumineux sont traités en arrière-plan via des modèles de vision.
+- **Évaluation automatique** : Chaque réponse est évaluée par le pipeline **Ragas** (Fidélité, Pertinence) sans faire attendre l'utilisateur.
+
+### 📡 Streaming Granulaire (SSE)
+Le backend expose un endpoint `/api/query/stream` qui renvoie :
+- Les blocs de réflexion de l'agent (**Thought Blocks**).
+- Le flux de tokens de la réponse finale.
+- Les événements de sélection de source et de fallback.
+
+### 📊 Intégration Data.gouv (MCP)
+Utilisation du protocole **Model Context Protocol (MCP)** pour interroger de manière "stateless" les jeux de données publics français, permettant une extraction de chiffres et de statistiques officielles.
 
 ---
 
-## ✨ Fonctionnalités
+## 🛠️ Stack Technique
 
-- **Dual-source retrieval** — interroge arXiv et data.gouv.fr en parallèle et fusionne les résultats
-- **Routing intelligent** — le LangGraph Router détecte la source la plus pertinente selon la question
-- **Chunking sémantique** — découpe les documents aux frontières logiques, pas à la coupure arbitraire
-- **Re-ranking** — les chunks récupérés sont re-classés par un cross-encoder avant d'aller au LLM
-- **Grounding check** — chaque affirmation est vérifiée contre les sources pour détecter les hallucinations
-- **Citations précises** — chaque réponse cite le titre, auteur, date et section du document source
-- **Mémoire conversationnelle** — historique compressé pour des échanges multi-tours cohérents
-- **API FastAPI** — endpoint REST + streaming SSE pour les réponses token par token
-- **Ingestion automatisée** — pipeline de mise à jour périodique des sources
-
----
-
-## 📊 Évaluation — RAGAS
-
-| Métrique | Score |
-|---|---|
-| Faithfulness | `0.xx` |
-| Context Recall | `0.xx` |
-| Context Precision | `0.xx` |
-| Answer Relevancy | `0.xx` |
-
-> ⚠️ Évaluation en cours — scores à venir avec le benchmark complet sur 50 Q&A annotées.
+- **Framework API** : [FastAPI](https://fastapi.tiangolo.com/)
+- **Orchestration d'Agents** : [LangGraph](https://python.langchain.com/docs/langgraph)
+- **LLM Gateway** : [OpenRouter](https://openrouter.ai/) (Gemini 1.5 Pro, GPT-4o-mini)
+- **Extraction Web** : [Crawl4AI](https://crawl4ai.com/)
+- **Recherche Web** : [SearXNG](https://docs.searxng.org/)
+- **Base de Données** : PostgreSQL avec [SQLAlchemy](https://www.sqlalchemy.org/)
+- **Évaluation** : [Ragas](https://docs.ragas.io/)
+- **Vector Store** : FAISS (pour le RAG local sur le contenu crawlé)
 
 ---
 
-## 🗂️ Structure du projet
+## ⚙️ Installation & Lancement Local
 
-```
-research-agent/
-├── src/
-│   ├── agents/
-│   │   ├── router.py          # LangGraph router — sélection de source
-│   │   ├── retriever.py       # Retrieval hybride (dense + BM25)
-│   │   └── grounding.py       # Vérification des hallucinations
-│   ├── sources/
-│   │   ├── arxiv_loader.py    # Ingestion arXiv via API
-│   │   └── gouv_loader.py     # Ingestion data.gouv.fr via CKAN API
-│   ├── vectorstore/
-│   │   ├── indexer.py         # Chunking sémantique + embeddings
-│   │   └── retriever.py       # FAISS / Chroma query
-│   ├── pipeline/
-│   │   ├── graph.py           # LangGraph orchestration complète
-│   │   └── memory.py          # Gestion mémoire conversationnelle
-│   └── api/
-│       └── main.py            # FastAPI + streaming SSE
-├── ingestion/
-│   ├── fetch_arxiv.py         # Fetch périodique arXiv
-│   └── fetch_gouv.py          # Fetch périodique data.gouv.fr
-├── evaluation/
-│   ├── benchmark.py           # Pipeline RAGAS
-│   └── dataset/               # Q&A annotées de référence
-├── tests/
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── README.md
-```
+### 1. Prérequis
+- Python 3.12+
+- PostgreSQL
+- Instance SearXNG (ou accès à une instance distante)
 
----
-
-## 🚀 Installation & lancement
-
-### Prérequis
-
-- Python 3.11+
-- Docker (optionnel)
-- Clé API OpenAI ou modèle local via Ollama
-
-### Installation locale
-
+### 2. Installation
 ```bash
-# Cloner le repo
-git clone https://github.com/marinaKpamegan/research-agent.git
+git clone <votre-repo-backend>
 cd research-agent
-
-# Créer l'environnement virtuel
-python -m venv venv
-source venv/bin/activate  # Windows : venv\Scripts\activate
-
-# Installer les dépendances
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# Configurer les variables d'environnement
-cp .env.example .env
-# Éditer .env avec ta clé API et tes paramètres
 ```
 
-### Variables d'environnement
-
+### 3. Configuration (Variables d'environnement)
+Créez un fichier `.env` à la racine :
 ```env
-OPENAI_API_KEY=sk-...          # ou HUGGINGFACE_API_KEY pour les modèles open source
-ARXIV_CATEGORIES=cs.AI,cs.CL,cs.IR,cs.LG
-ARXIV_MAX_RESULTS=500
-GOUV_API_URL=https://www.data.gouv.fr/api/1
-VECTOR_STORE=faiss             # faiss ou chroma
-EMBEDDING_MODEL=text-embedding-3-small
+# Database
+DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/researchagent
+
+# LLM APIs
+OPENROUTER_API_KEY=votre_cle_openrouter
+OPENAI_API_KEY=votre_cle_openai (pour les embeddings)
+
+# Services
+SEARXNG_URL=http://votre-instance-searxng:8080
+MCP_SERVER=https://mcp.data.gouv.fr/mcp
+
+# Auth
+SECRET_KEY=votre_cle_secrete_jwt
 ```
 
-### Lancer l'ingestion
-
+### 4. Initialisation de la Base de Données
 ```bash
-# Ingérer les sources (première fois)
-python ingestion/fetch_arxiv.py
-python ingestion/fetch_gouv.py
-
-# Lancer l'API
-uvicorn src.api.main:app --reload --port 8000
+# Assurez-vous que PostgreSQL est lancé et que la DB existe
+python fix_db.py # Script utilitaire pour s'assurer que les tables sont correctes
 ```
 
-### Avec Docker
-
+### 5. Lancement du serveur
 ```bash
-docker-compose up --build
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ---
 
-## 💬 Utilisation
+## 📂 Structure du Code
 
-### Via l'API REST
-
-```python
-import requests
-
-response = requests.post("http://localhost:8000/query", json={
-    "question": "Quelles sont les dernières avancées en RAG hybride ?",
-    "sources": ["arxiv", "gouv"],  # ou ["arxiv"] / ["gouv"] pour cibler
-    "top_k": 5
-})
-
-print(response.json())
-# {
-#   "answer": "...",
-#   "sources": [{"title": "...", "url": "...", "date": "..."}],
-#   "faithfulness_score": 0.91
-# }
-```
-
-### Streaming SSE
-
-```python
-import httpx
-
-with httpx.stream("POST", "http://localhost:8000/query/stream",
-                  json={"question": "..."}) as r:
-    for chunk in r.iter_text():
-        print(chunk, end="", flush=True)
-```
-
----
-
-## 🛣️ Roadmap
-
-- [x] Ingestion arXiv (cs.AI, cs.CL, cs.IR, cs.LG)
-- [x] Ingestion data.gouv.fr via CKAN API
-- [x] Pipeline RAG LangChain de base
-- [x] LangGraph orchestration multi-sources
-- [x] API FastAPI + streaming SSE
-- [ ] Re-ranking cross-encoder
-- [ ] Grounding check anti-hallucination
-- [ ] Benchmark RAGAS complet
-- [ ] Démo live en ligne
-- [ ] Interface Streamlit
-- [ ] Mise à jour automatique des sources (cron)
-
----
-
-## 🧠 Choix techniques
-
-**Pourquoi LangGraph plutôt qu'une chaîne LangChain simple ?**
-Le routing entre deux sources hétérogènes (arXiv = PDF scientifiques / data.gouv.fr = métadonnées JSON) nécessite un agent avec état et décision conditionnelle — exactement ce pour quoi LangGraph est conçu.
-
-**Pourquoi FAISS / Chroma ?**
-FAISS pour la performance en local sur un corpus de 500+ documents. Chroma pour la persistance et les filtres de métadonnées (date, catégorie, source). Le choix se configure via variable d'environnement.
-
-**Pourquoi ces deux sources ?**
-La combinaison arXiv + data.gouv.fr est rare et complémentaire : arXiv couvre la veille scientifique mondiale, data.gouv.fr apporte le contexte réglementaire et les données publiques françaises — utile pour des cas d'usage IA souveraine, exactement ce que des acteurs comme Lyha adressent.
-
----
-
-## 👩‍💻 Auteure
-
-**Falonne KPAMEGAN** — Data Scientist · Data Engineer · AI Engineer
-
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-falonne--kpamegan-blue?style=flat-square&logo=linkedin)](https://linkedin.com/in/falonne-kpamegan)
-[![Portfolio](https://img.shields.io/badge/Portfolio-falonnekpamegan.site-teal?style=flat-square)](https://falonnekpamegan.site)
-[![GitHub](https://img.shields.io/badge/GitHub-marinaKpamegan-black?style=flat-square&logo=github)](https://github.com/marinaKpamegan)
+- `app/api` : Endpoints FastAPI (auth, query, preferences).
+- `app/agents` : Cœur de la logique agentique et définition du graphe LangGraph.
+- `app/services` : Services tiers (ArXiv, PWC, PDF Visual, SearXNG, Crawl4AI).
+- `app/db` : Modèles SQLAlchemy et repositories.
+- `app/schemas` : Modèles Pydantic pour la validation API.
 
 ---
 
 ## 📄 Licence
-
-MIT License — voir [LICENSE](LICENSE)
+[MIT](LICENSE)

@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../research-agent-frontend"
+		},
+		{
+			"path": "../../../datagouv-mcp"
+		}
+	],
+	"settings": {}
+}

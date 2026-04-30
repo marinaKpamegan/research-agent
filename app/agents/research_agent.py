@@ -1,6 +1,8 @@
+import asyncio
 import logging
 from typing import List, Dict, Any, Literal
 from langgraph.graph import StateGraph, START, END
+from langchain_core.runnables import RunnableConfig
 
 from app.services.openrouter_service import OpenRouterService
 from app.memory.simple_memory import SimpleMemory
@@ -28,6 +30,7 @@ class ResearchAgent:
         workflow.add_node("search_arxiv", self._search_arxiv)
         workflow.add_node("search_pwc", self._search_pwc)
         workflow.add_node("search_datagouv", self._search_datagouv)
+        workflow.add_node("search_web", self._search_web)
         workflow.add_node("generate_answer", self._generate_answer)
         
         # Define edges
@@ -40,7 +43,8 @@ class ResearchAgent:
             {
                 "arxiv": "search_arxiv",
                 "paperswithcode": "search_pwc",
-                "datagouv": "search_datagouv"
+                "datagouv": "search_datagouv",
+                "web": "search_web"
             }
         )
         
@@ -48,23 +52,33 @@ class ResearchAgent:
         def check_arxiv_fallback(state: AgentState) -> str:
             if not state.get("crawled_content") and state.get("selected_source") == "arxiv":
                 return "search_pwc"
+            elif not state.get("crawled_content"):
+                return "search_web"
             return "generate_answer"
             
         def check_pwc_fallback(state: AgentState) -> str:
             if not state.get("crawled_content") and state.get("selected_source") == "paperswithcode":
                 return "search_arxiv"
+            elif not state.get("crawled_content"):
+                return "search_web"
+            return "generate_answer"
+            
+        def check_datagouv_fallback(state: AgentState) -> str:
+            if not state.get("crawled_content"):
+                return "search_web"
             return "generate_answer"
         
         workflow.add_conditional_edges("search_arxiv", check_arxiv_fallback)
         workflow.add_conditional_edges("search_pwc", check_pwc_fallback)
-        workflow.add_edge("search_datagouv", "generate_answer")
+        workflow.add_conditional_edges("search_datagouv", check_datagouv_fallback)
+        workflow.add_edge("search_web", "generate_answer")
         workflow.add_edge("generate_answer", END)
         
         return workflow.compile()
 
     # --- Nodes ---
 
-    async def _route_query(self, state: AgentState) -> Dict[str, Any]:
+    async def _route_query(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         """Node: Use LLM to analyze the question and select the source."""
         question = state["question"]
         logger.info(f"Routing query: {question}")
@@ -75,27 +89,35 @@ Question : "{question}"
 
 ## Règle fondamentale
 Analyse l'INTENTION de la question, pas ses mots-clés superficiels.
-"entreprises de data à Lyon" → l'intention est de TROUVER DES ENTREPRISES en France → datagouv
-"comment fonctionne un modèle de data augmentation" → l'intention est de COMPRENDRE UN CONCEPT → arxiv
+"entreprises de data à Lyon" → l'intention est de TROUVER DES ENTREPRISES → web
+"nombre d'emplois dans le numérique en France" → l'intention est d'obtenir des STATISTIQUES OFFICIELLES → datagouv
+"comment fonctionne un transformer" → l'intention est de COMPRENDRE UN CONCEPT → arxiv
 
 ## Sources disponibles
 
-"datagouv" — Données publiques françaises
-→ Choisis cette source si la question cherche des ACTEURS, des LIEUX ou des CHIFFRES en France :
-  - Entreprises, sociétés, startups, ESN, agences localisées en France (même si elles font de l'IA ou de la data)
-  - Statistiques économiques, sociales, démographiques françaises
-  - Budget, administrations, collectivités, marchés publics
-  - Transport, énergie, écologie, immobilier, santé en France
-  - Élections, recensements, emploi par région ou département
-⚠️ Si la question mentionne une ville française, une entreprise ou un secteur économique en France → datagouv en priorité absolue, même si les mots "IA" ou "data" apparaissent.
+"web" — Recherche générale sur Internet
+→ Choisis cette source si la question cherche des ACTEURS ÉCONOMIQUES ou des INFORMATIONS GÉNÉRALES :
+  - Entreprises, sociétés, startups, ESN, agences, cabinets (peu importe leur domaine ou leur ville)
+  - Prestataires, consultants, freelances, recruteurs
+  - Actualités, événements, personnes publiques
+  - Tout ce qui ne rentre pas dans les autres catégories
+⚠️ Dès qu'on cherche UNE LISTE D'ENTREPRISES ou DE PRESTATAIRES → web, toujours, même si c'est en France.
+
+"datagouv" — Statistiques et données publiques françaises officielles
+→ Choisis cette source si la question cherche des CHIFFRES ou DONNÉES OFFICIELLES de l'État français :
+  - Statistiques économiques, sociales, démographiques (INSEE, Banque de France…)
+  - Budget de l'État, marchés publics, dépenses ministérielles
+  - Transport, énergie, écologie, immobilier, santé — sous forme de datasets
+  - Élections, recensements, emploi par région (chiffres bruts)
+⚠️ Ne jamais choisir datagouv si la question cherche des entreprises ou prestataires spécifiques.
+⚠️ datagouv donne des STATISTIQUES, pas des ANNUAIRES D'ENTREPRISES.
 
 "arxiv" — Recherche académique et scientifique
 → Choisis cette source si la question cherche à COMPRENDRE ou EXPLORER un concept scientifique :
   - Fonctionnement théorique d'un algorithme ou d'une architecture (transformers, diffusion, RL…)
-  - Publications, auteurs, papiers de recherche
+  - Publications, auteurs, papiers de recherche, surveys
   - Mathématiques, physique, sciences fondamentales
-  - État de l'art théorique sur un sujet
-⚠️ Ne jamais choisir arxiv si la question mentionne une ville, une entreprise ou un territoire français.
+⚠️ Ne jamais choisir arxiv si la question mentionne des entreprises ou des acteurs économiques.
 
 "paperswithcode" — Implémentations et benchmarks
 → Choisis cette source si la question cherche du CODE ou des PERFORMANCES :
@@ -109,38 +131,58 @@ Analyse l'INTENTION de la question, pas ses mots-clés superficiels.
 
 | Question | Source | Raison |
 |---|---|---|
-| "entreprises IA à Lyon" | datagouv | recherche d'acteurs économiques localisés |
-| "startups data en Île-de-France" | datagouv | entreprises en France |
-| "nombre d'emplois dans le numérique en France" | datagouv | statistique économique française |
-| "budget IA du gouvernement français 2024" | datagouv | données publiques françaises |
+| "entreprises IA à Lyon" | web | on cherche des acteurs économiques, pas des stats |
+| "startups data en Île-de-France" | web | liste d'entreprises → web |
+| "ESN spécialisées en data à Lyon" | web | annuaire d'entreprises → web |
+| "meilleures agences IA en France" | web | acteurs économiques → web |
+| "prestataires data science à Bordeaux" | web | acteurs économiques → web |
+| "nombre d'emplois dans le numérique en France" | datagouv | statistique officielle INSEE |
+| "budget IA du gouvernement français 2024" | datagouv | donnée publique officielle |
+| "taux de chômage à Lyon en 2023" | datagouv | statistique démographique |
+| "consommation énergétique par région" | datagouv | dataset public français |
 | "comment fonctionne l'attention dans les transformers" | arxiv | concept théorique académique |
 | "derniers papiers sur le RAG hybride" | arxiv | recherche de publications |
 | "état de l'art sur la détection d'anomalies" | arxiv | survey académique |
 | "meilleures implémentations de RAG sur GitHub" | paperswithcode | recherche de code |
 | "quel LLM a le meilleur score sur MMLU" | paperswithcode | benchmark de performance |
 | "fine-tuner BERT en Python" | paperswithcode | implémentation technique |
+| "météo à Paris aujourd'hui" | web | actualité générale |
+| "qui est Elon Musk" | web | culture générale |
 
 ## Réponse
-Réponds UNIQUEMENT par un seul mot parmi : arxiv, paperswithcode, datagouv
+Réponds UNIQUEMENT par un seul mot parmi : arxiv, paperswithcode, datagouv, web
 Aucune ponctuation, aucune explication.
 """
+        from langchain_openai import ChatOpenAI
+        from app.core.config import settings
+        
+        llm = ChatOpenAI(
+            base_url=settings.OPENROUTER_API_URL,
+            api_key=settings.OPENROUTER_API_KEY,
+            model="openai/gpt-4o-mini",
+            temperature=0,
+            streaming=True
+        ).with_config({"run_name": "route_query"})
+        
         messages = [{"role": "user", "content": prompt}]
-        response = await self.openrouter.create_chat_completion(messages)
-        source = self.openrouter.extract_response_content(response).strip().lower()
+        res = await llm.ainvoke(messages, config=config)
+        source = res.content.strip().lower()
         
         # Fallback sanitize
         if "datagouv" in source:
             selected = "datagouv"
         elif "papers" in source or "code" in source or "pwc" in source:
             selected = "paperswithcode"
-        else:
+        elif "arxiv" in source:
             selected = "arxiv"
+        else:
+            selected = "web"
             
         logger.info(f"Selected source: {selected}")
         return {"selected_source": selected}
 
-    async def _search_arxiv(self, state: AgentState) -> Dict[str, Any]:
-        """Node: Search Arxiv for papers."""
+    async def _search_arxiv(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+        """Node: Search ArXiv for scientific papers."""
         question = state["question"]
         logger.info(f"Searching ArXiv for: {question}")
         
@@ -168,7 +210,7 @@ Aucune ponctuation, aucune explication.
             
         return {"crawled_content": content}
 
-    async def _search_pwc(self, state: AgentState) -> Dict[str, Any]:
+    async def _search_pwc(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         """Node: Search Papers With Code."""
         question = state["question"]
         logger.info(f"Searching Papers With Code for: {question}")
@@ -183,8 +225,8 @@ Aucune ponctuation, aucune explication.
         content = await self.pwc_service.search_papers(pwc_query, max_results=3)
         return {"crawled_content": content}
 
-    async def _search_datagouv(self, state: AgentState) -> Dict[str, Any]:
-        """Node: Search Datagouv via MCP with SSE and create_react_agent."""
+    async def _search_datagouv(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+        """Node: Search Data.gouv.fr using MCP."""
         question = state["question"]
         logger.info(f"Searching Data.gouv.fr (MCP) for: {question}")
         
@@ -301,7 +343,57 @@ Aucune ponctuation, aucune explication.
                 
         return {"crawled_content": content, "pending_backgroundtasks": bg_tasks_list if 'bg_tasks_list' in locals() else []}
 
-    async def _generate_answer(self, state: AgentState) -> Dict[str, Any]:
+    async def _search_web(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
+        """Node: Search Web with SearXNG and crawl."""
+        question = state["question"]
+        logger.info(f"Searching Web (SearXNG) for: {question}")
+        
+        from langchain_community.utilities import SearxSearchWrapper
+        from app.core.config import settings
+        from app.services.crawling_service import CrawlingService
+        
+        query_prompt = f"Génère une requête très courte (max 5 mots clés) pour chercher sur le web à partir de cette question: {question}\nRéponds UNIQUEMENT avec les mots clés sans ponctuation."
+        from langchain_openai import ChatOpenAI
+        
+        llm = ChatOpenAI(
+            base_url=settings.OPENROUTER_API_URL,
+            api_key=settings.OPENROUTER_API_KEY,
+            model="openai/gpt-4o-mini",
+            temperature=0,
+            streaming=True
+        ).with_config({"run_name": "generate_web_query"})
+        
+        messages = [{"role": "user", "content": query_prompt}]
+        res = await llm.ainvoke(messages, config=config)
+        web_query = res.content.strip()
+        
+        logger.info(f"Web query: {web_query}")
+        
+        try:
+            searx = SearxSearchWrapper(searx_host=settings.SEARXNG_URL)
+            # On utilise results() pour obtenir des dictionnaires avec 'link' et 'title'
+            results = await asyncio.to_thread(searx.results, web_query, num_results=3)
+            urls = [r["link"] for r in results if "link" in r]
+            logger.info(f"Web results: {urls}")
+        except Exception as e:
+            logger.error(f"SearXNG error: {e}")
+            urls = []
+            
+        new_content = []
+        if urls:
+            crawler = CrawlingService()
+            scraped = await crawler.scrape_urls(urls)
+            for item in scraped:
+                new_content.append({
+                    "url": item["url"], 
+                    "title": item["title"] or "Web Page", 
+                    "content": item["markdown"],
+                    "score": 1.0
+                })
+                
+        return {"crawled_content": new_content, "urls": urls}
+
+    async def _generate_answer(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         """Node: Synthesize a final answer from all retrieved context and keywords."""
         question = state["question"]
         content = state.get("crawled_content", [])
@@ -343,15 +435,16 @@ Consignes :
             api_key=settings.OPENROUTER_API_KEY,
             model="openai/gpt-4o-mini",
             streaming=True,
-            temperature=0.3
+            temperature=0.8
         ).with_config({"run_name": "generate_answer"})
         
         messages = [{"role": "user", "content": prompt}]
         
         answer = ""
-        async for chunk in llm.astream(messages):
+        async for chunk in llm.astream(messages, config=config):
             answer += chunk.content
         
+        logger.info(f"Answer: {answer}")
         return {"answer": answer}
 
     async def stream_question(self, question: str, interests: List[str] = None, preferred_links: List[str] = None):
@@ -384,7 +477,7 @@ Consignes :
             tags = event.get("tags", [])
             
             # Afficher le bloc de raisonnement complet à la fin du nœud
-            if kind == "on_chain_end" and langgraph_node in ["route_query", "search_arxiv", "search_pwc"]:
+            if kind == "on_chain_end" and langgraph_node in ["route_query", "search_arxiv", "search_pwc", "search_web"]:
                 thought = thought_buffer.get(langgraph_node, "")
                 if thought:
                     yield json.dumps({"step": "thinking_block", "message": thought, "data": None})
@@ -398,7 +491,8 @@ Consignes :
                     source_labels = {
                         "arxiv": "Source choisie : arXiv",
                         "paperswithcode": "Source choisie : Papers With Code",
-                        "datagouv": "Source choisie : data.gouv.fr"
+                        "datagouv": "Source choisie : data.gouv.fr",
+                        "web": "Source choisie : Web (Général)"
                     }
                     yield json.dumps({
                         "step": "source_selected",
@@ -422,6 +516,14 @@ Consignes :
                         yield json.dumps({"step": "search_pwc", "message": "Recherche sur Papers With Code (GitHub & benchmarks)...", "data": None})
                 elif langgraph_node == "search_datagouv":
                     yield json.dumps({"step": "search_datagouv", "message": "Consultation du catalogue d'État Data.gouv.fr...", "data": None})
+                elif langgraph_node == "search_web":
+                    if current_source not in ["web", ""]:
+                        fallback_from = current_source.capitalize()
+                        if current_source == "paperswithcode": fallback_from = "PWC"
+                        if current_source == "datagouv": fallback_from = "Data.gouv"
+                        yield json.dumps({"step": "fallback", "message": f"{fallback_from} sans résultat — repli d'urgence ultime sur le Web...", "data": None})
+                    else:
+                        yield json.dumps({"step": "search_web", "message": "Recherche générale sur le Web avec SearXNG...", "data": None})
                 elif langgraph_node == "generate_answer":
                     yield json.dumps({"step": "generate_answer", "message": "Génération de la réponse finale...", "data": None})
                     
@@ -436,16 +538,27 @@ Consignes :
             if kind == "on_chat_model_stream":
                 chunk = event["data"]["chunk"].content
                 if chunk and isinstance(chunk, str):
-                    if langgraph_node == "generate_answer":
+                    if langgraph_node == "generate_answer" or name == "generate_answer":
                         yield json.dumps({"step": "stream", "message": chunk, "data": None})
-                    elif langgraph_node in ["route_query", "search_arxiv", "search_pwc"]:
-                        thought_buffer[langgraph_node] = thought_buffer.get(langgraph_node, "") + chunk
+                    elif langgraph_node in ["route_query", "search_arxiv", "search_pwc", "search_web"] or name in ["route_query", "generate_web_query"]:
+                        node_key = langgraph_node or name
+                        thought_buffer[node_key] = thought_buffer.get(node_key, "") + chunk
                     
-            # Capture final state
-            if kind == "on_chain_end" and name == "LangGraph":
-                output = event["data"].get("output", {})
-                if output:
-                    last_state.update(output)
+            # Capture state updates from all nodes and the root graph
+            if kind == "on_chain_end":
+                output = event.get("data", {}).get("output", {})
+                if isinstance(output, dict):
+                    for k, v in output.items():
+                        if k in ["crawled_content", "urls", "pending_backgroundtasks"] and k in last_state and isinstance(v, list):
+                            # Accumulate lists for keys that use operator.add in AgentState
+                            for item in v:
+                                if item not in last_state[k]:
+                                    last_state[k].append(item)
+                            logger.info(f"Accumulated {k}: {len(last_state[k])} items total (added {len(v)})")
+                        else:
+                            last_state[k] = v
+                    if "answer" in output:
+                        logger.info(f"Answer updated in state (length: {len(output['answer'])})")
                 
         # Final Event
         crawled = last_state.get('crawled_content', [])

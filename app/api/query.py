@@ -66,14 +66,10 @@ async def post_query(
 
 async def save_history_and_process_bg_tasks(feed_repo: FeedRepository, user_id: int, question: str, answer: str, contexts: list, bg_tasks: list):
     try:
-        from app.services.evaluation_service import EvaluationService
-        evaluator = EvaluationService()
+        # from app.services.evaluation_service import EvaluationService
+        # evaluator = EvaluationService()
         
-        scores = {}
-        # Avoid evaluating if everything is empty or missing keys
-        import asyncio
-        if len(answer.strip()) > 5:
-            scores = await asyncio.to_thread(evaluator.run_evaluation, question, answer, [c.get("text", c.get("url", "")) for c in contexts])
+        scores = {} # Evaluation disabled
             
         feed = FeedCreate(
             title=question, 

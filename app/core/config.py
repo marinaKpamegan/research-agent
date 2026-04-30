@@ -31,5 +31,6 @@ class Settings:
     OPENAI_API_URL: str = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
     OPENAI_EMBEDDING_MODEL: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
     MCP_SERVER: str = os.getenv("MCP_SERVER", "https://mcp.data.gouv.fr/mcp")
+    SEARXNG_URL: str = os.getenv("SEARXNG_URL", "")
 
 settings = Settings()
