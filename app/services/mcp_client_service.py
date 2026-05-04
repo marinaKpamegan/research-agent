@@ -55,6 +55,9 @@ class McpClientService:
                     # 2. Closure d'Appel HTTP POST JSON-RPC ("tools/call")
                     def create_closure(_name: str, _url: str):
                         async def func_wrapper(**kwargs) -> str:
+                            # NETTOYAGE : Supprimer les arguments None pour éviter les erreurs de validation MCP
+                            cleaned_args = {k: v for k, v in kwargs.items() if v is not None}
+                            
                             async with httpx.AsyncClient() as inner_client:
                                 try:
                                     call_resp = await inner_client.post(
@@ -67,7 +70,7 @@ class McpClientService:
                                             "jsonrpc": "2.0", 
                                             "id": 2, 
                                             "method": "tools/call", 
-                                            "params": {"name": _name, "arguments": kwargs}
+                                            "params": {"name": _name, "arguments": cleaned_args}
                                         },
                                         timeout=45.0
                                     )

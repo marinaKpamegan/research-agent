@@ -19,7 +19,7 @@ class PdfRagService:
     def __init__(self):
         # Initialisation du LLM Multimodal Gemini 1.5 Pro via OpenRouter
         self.llm = ChatOpenAI(
-            model="openai/gpt-4o-mini",
+            model=settings.DEFAULT_AI_MODEL,
             base_url=settings.OPENROUTER_API_URL,
             api_key=settings.OPENROUTER_API_KEY,
             temperature=0.0,

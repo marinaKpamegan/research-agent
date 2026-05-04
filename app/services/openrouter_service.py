@@ -47,7 +47,7 @@ class OpenRouterService:
         """
         Crée une completion de chat via OpenRouter en utilisant LangChain.
         """
-        effective_model = model or self.default_model
+        effective_model = settings.DEFAULT_AI_MODEL
         
         logger.info(f"Création chat completion - model: {effective_model}, purpose: {purpose}, nb_messages: {len(messages)}")
         
@@ -59,7 +59,7 @@ class OpenRouterService:
                 api_key=self.api_key,
                 base_url=self.base_url,
                 temperature=temperature,
-                max_tokens=max_tokens or 1000, # Reasonable default to avoid credit issues
+                max_tokens=max_tokens or 2000, # Reasonable default to avoid credit issues
                 streaming=True
             )
 
@@ -86,37 +86,37 @@ class OpenRouterService:
             logger.error(f"Erreur OpenRouter (LangChain): {str(e)}", exc_info=True)
             raise
     
-    async def stream_chat_completion(
-        self,
-        messages: List[Dict[str, str]],
-        model: Optional[str] = None,
-        temperature: float = 0.7,
-    ) -> AsyncIterator[str]:
-        """
-        Crée une completion de chat en streaming.
-        """
-        effective_model = model or self.default_model
-        logger.info(f"Streaming chat completion - model: {effective_model}")
+    # async def stream_chat_completion(
+    #     self,
+    #     messages: List[Dict[str, str]],
+    #     model: Optional[str] = None,
+    #     temperature: float = 0.7,
+    # ) -> AsyncIterator[str]:
+    #     """
+    #     Crée une completion de chat en streaming.
+    #     """
+    #     effective_model = model or self.default_model
+    #     logger.info(f"Streaming chat completion - model: {effective_model}")
         
-        llm = self.chat_model
-        if model or temperature != 0.7:
-            llm = ChatOpenRouter(
-                model=effective_model,
-                api_key=self.api_key,
-                base_url=self.base_url,
-                temperature=temperature,
-                max_tokens=1000, # Reasonable default
-                streaming=True
-            )
+    #     llm = self.chat_model
+    #     if model or temperature != 0.7:
+    #         llm = ChatOpenRouter(
+    #             model=effective_model,
+    #             api_key=self.api_key,
+    #             base_url=self.base_url,
+    #             temperature=temperature,
+    #             max_tokens=1000, # Reasonable default
+    #             streaming=True
+    #         )
         
-        try:
-            lc_messages = self._convert_messages(messages)
-            async for chunk in llm.astream(lc_messages):
-                yield chunk.content
+    #     try:
+    #         lc_messages = self._convert_messages(messages)
+    #         async for chunk in llm.astream(lc_messages):
+    #             yield chunk.content
                             
-        except Exception as e:
-            logger.error(f"Erreur streaming OpenRouter (LangChain): {str(e)}", exc_info=True)
-            raise
+    #     except Exception as e:
+    #         logger.error(f"Erreur streaming OpenRouter (LangChain): {str(e)}", exc_info=True)
+    #         raise
     
     def extract_response_content(self, response: Dict) -> str:
         """
