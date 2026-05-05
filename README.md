@@ -1,49 +1,62 @@
-# 🧠 Research Agent (Backend)
+# 🚀 AI Research Agent: Multi-Expert Grounding System
 
-Bienvenue dans le cœur moteur de **Research Agent**, un service de recherche agentique haute performance construit avec **FastAPI** et **LangGraph**. Ce backend orchestre l'exploration de sources multiples, l'analyse visuelle de documents et la synthèse de réponses sourcées.
+[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
+[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange.svg)](https://python.langchain.com/docs/langgraph)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
+
+## 💼 Le Problème Business
+**"L'infobésité et le risque d'hallucination freinent la prise de décision."**
+
+Dans les secteurs de la recherche, de la tech et de l'administration, les experts perdent des heures à croiser des sources hétérogènes (papiers scientifiques, datasets gouvernementaux, benchmarks de code). Les LLM classiques, bien que puissants, souffrent de deux limites majeures :
+1.  **Hallucinations** : Incapacité à citer des sources vérifiables.
+2.  **Données froides** : Ignorance des publications de la veille ou des derniers budgets officiels.
+
+**Research Agent** résout ce problème en agissant comme un **système de recherche autonome et ancré (grounded)**, capable d'interroger simultanément des sources expertes pour livrer une synthèse sourcée et vérifiable en quelques secondes.
 
 ---
 
-## 🏗️ Architecture & Flux de Données
+## 🏗️ Ingénierie Backend & Architecture
 
-Le backend repose sur un graphe d'états (StateGraph) qui gère intelligemment le flux de recherche :
+Le cœur du système repose sur un graphe d'états complexe développé avec **LangGraph**, conçu pour la performance et la précision.
 
-1.  **Router (LLM)** : Analyse la question et choisit la source la plus pertinente (ArXiv, PWC, Data.gouv ou Web).
-2.  **Search Nodes** : Interrogent les APIs spécialisées ou le moteur de recherche **SearXNG**.
-3.  **Extraction (Crawl4AI)** : Scrape et nettoie le contenu des pages web pour un contexte de haute qualité.
-4.  **Fallback Logic** : Si une source experte échoue, l'agent bascule automatiquement vers une recherche web généraliste.
-5.  **Synthèse (OpenRouter)** : Génère une réponse finale en citant précisément les sources utilisées.
+### ⚡ Parallélisme Scientifique (Fan-out/Fan-in)
+Pour les requêtes identifiées comme "Science" par le routeur LLM, le backend déclenche une exécution parallèle :
+- **Node ArXiv** : Extraction de publications académiques via l'API ArXiv.
+- **Node PapersWithCode** : Recherche d'implémentations GitHub et de benchmarks SOTA.
+Cette architecture divise par deux le temps de réponse et permet une synthèse riche (Théorie + Code).
+
+### 🏛️ Intégration Data.gouv via MCP
+L'agent utilise le **Model Context Protocol (MCP)** pour interroger dynamiquement les API de l'État français. 
+- **Tooling Dynamique** : Nettoyage d'arguments à la volée pour assurer la stabilité des appels API.
+- **Récupération de Statistiques** : Capacité à extraire des chiffres précis (ex: budgets ministériels) directement depuis les datasets officiels.
+
+### 🔍 RAG Hybride & Vision Asynchrone
+- **Scraping Intelligent** : Utilisation de **Crawl4AI** pour transformer des pages web complexes en Markdown propre.
+- **Vector Search** : Stockage local éphémère dans **FAISS** pour un RAG contextuel précis sur les contenus fraîchement crawllés.
 
 ---
 
-## ✨ Fonctionnalités Avancées
-
-### 🚀 Traitement Asynchrone & Non-Bloquant
-L'utilisation de `asyncio.create_task` permet de détacher les tâches lourdes du cycle de réponse HTTP :
-- **Analyse PDF Vision** : Les documents volumineux sont traités en arrière-plan via des modèles de vision.
-- **Évaluation automatique** : Chaque réponse est évaluée par le pipeline **Ragas** (Fidélité, Pertinence) sans faire attendre l'utilisateur.
+## ✨ Fonctionnalités orientées "Production"
 
 ### 📡 Streaming Granulaire (SSE)
-Le backend expose un endpoint `/api/query/stream` qui renvoie :
-- Les blocs de réflexion de l'agent (**Thought Blocks**).
-- Le flux de tokens de la réponse finale.
-- Les événements de sélection de source et de fallback.
+L'interface ne "load" pas dans le vide. Le backend streame en temps réel via Server-Sent Events :
+- **Reasoning Panel** : Les étapes de réflexion de l'agent.
+- **Status Events** : Sélection de source, démarrage des recherches parallèles
 
-### 📊 Intégration Data.gouv (MCP)
-Utilisation du protocole **Model Context Protocol (MCP)** pour interroger de manière "stateless" les jeux de données publics français, permettant une extraction de chiffres et de statistiques officielles.
+### 🛡️ Robustesse & Observabilité
+- **Error Handling Front-to-Back** : Interception des erreurs de session (401) et des crashs backend avec notification immédiate au frontend via le flux SSE.
+- **Recursion Guard** : Limite de profondeur du graphe pour éviter les boucles infinies sur des recherches complexes.
+- **Évaluation RAGAS** : Pipeline intégré pour mesurer la fidélité de la réponse par rapport au contexte extrait.
 
 ---
 
 ## 🛠️ Stack Technique
 
-- **Framework API** : [FastAPI](https://fastapi.tiangolo.com/)
-- **Orchestration d'Agents** : [LangGraph](https://python.langchain.com/docs/langgraph)
-- **LLM Gateway** : [OpenRouter](https://openrouter.ai/) (Gemini 1.5 Pro, GPT-4o-mini)
-- **Extraction Web** : [Crawl4AI](https://crawl4ai.com/)
-- **Recherche Web** : [SearXNG](https://docs.searxng.org/)
-- **Base de Données** : PostgreSQL avec [SQLAlchemy](https://www.sqlalchemy.org/)
-- **Évaluation** : [Ragas](https://docs.ragas.io/)
-- **Vector Store** : FAISS (pour le RAG local sur le contenu crawlé)
+- **Framework** : FastAPI (Python 3.12)
+- **Intelligence** : LangGraph, LangChain, OpenRouter (Gemini 2.0 Flash, GPT-4o-mini)
+- **Data & Search** : SearXNG (Web), MCP (Data.gouv), ArXiv, PapersWithCode
+- **Parsing & Vector** : Crawl4AI, FAISS, SQLAlchemy (PostgreSQL)
+- **Monitoring** : Ragas (Évaluation de la qualité)
 
 ---
 
@@ -71,7 +84,6 @@ DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/researchagent
 
 # LLM APIs
 OPENROUTER_API_KEY=votre_cle_openrouter
-OPENAI_API_KEY=votre_cle_openai (pour les embeddings)
 
 # Services
 SEARXNG_URL=http://votre-instance-searxng:8080

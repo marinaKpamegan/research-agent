@@ -81,7 +81,7 @@ class ResearchAgent:
 ## Exemples
 | Question | Source | Raison |
 |---|---|---|
-| "Datasets du ministère de la culture" | données gouvernementales | data gouvernementale | datagouv | Ministère français |
+| "Datasets du ministère de la culture" | datagouv | Ministère français |
 | "Budget de l'éducation nationale" | datagouv | Administration française |
 | "Papiers sur le RAG" | science | Recherche IA |
 | "Liste des ESN à Lyon" | web | Entreprises |
