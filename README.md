@@ -4,14 +4,20 @@
 [![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange.svg)](https://python.langchain.com/docs/langgraph)
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-green.svg)](https://fastapi.tiangolo.com/)
 
-## 💼 Le Problème Business
-**"L'infobésité et le risque d'hallucination freinent la prise de décision."**
+## 💼 Le Problème Business : La quête de la vérité à l'ère de l'infobésité
+**"Dans un monde saturé d'informations, la rapidité d'accès à une donnée vérifiable est un avantage stratégique."**
 
-Dans les secteurs de la recherche, de la tech et de l'administration, les experts perdent des heures à croiser des sources hétérogènes (papiers scientifiques, datasets gouvernementaux, benchmarks de code). Les LLM classiques, bien que puissants, souffrent de deux limites majeures :
-1.  **Hallucinations** : Incapacité à citer des sources vérifiables.
-2.  **Données froides** : Ignorance des publications de la veille ou des derniers budgets officiels.
+Les experts (chercheurs, data scientists, décideurs publics) font face à un défi triple que les LLM généralistes ne peuvent résoudre seuls :
 
-**Research Agent** résout ce problème en agissant comme un **système de recherche autonome et ancré (grounded)**, capable d'interroger simultanément des sources expertes pour livrer une synthèse sourcée et vérifiable en quelques secondes.
+1.  **Fragmentation des Données** : L'information technique est dispersée. Un papier académique est sur **ArXiv**, alors que son implémentation et ses benchmarks sont sur **PapersWithCode**. Croiser ces deux sources manuellement est fastidieux.
+2.  **Le Paradoxe de la Confiance (Hallucinations)** : Les LLM "standard" ont tendance à inventer des faits pour paraître cohérents. Pour des décisions à fort enjeu (investissements technologiques, recherche scientifique), l'incertitude est inacceptable.
+3.  **Accès aux Données Publiques** : Les LLM n'ont pas d'accès direct et structuré aux datasets officiels (ex: Data.gouv.fr), rendant les recherches administratives ou budgétaires imprécises.
+
+### 💡 La Solution : Research Agent
+**Research Agent** transforme ce processus en un flux automatisé et intelligent :
+- **Parallélisation Scientifique** : Pour les requêtes de recherche, il interroge simultanément **ArXiv** et **PapersWithCode**, fusionnant théorie et code en un seul flux asynchrone.
+- **Ancrage (Grounding) sur Données Réelles** : Chaque affirmation est liée à une source réelle récupérée via des API spécialisées ou le protocole MCP.
+- **Gain de Productivité** : Ce qui prenait 30 minutes de navigation entre différents onglets est réduit à une synthèse structurée en quelques secondes.
 
 ---
 
