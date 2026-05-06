@@ -59,9 +59,9 @@ L'interface ne "load" pas dans le vide. Le backend streame en temps réel via Se
 ## 🛠️ Stack Technique
 
 - **Framework** : FastAPI (Python 3.12)
-- **Intelligence** : LangGraph, LangChain, OpenRouter (Gemini 2.0 Flash, GPT-4o-mini)
+- **Intelligence** : LangGraph, LangChain, OpenRouter (Gemini 2.5 Flash)
 - **Data & Search** : SearXNG (Web), MCP (Data.gouv), ArXiv, PapersWithCode
-- **Parsing & Vector** : Crawl4AI, FAISS, SQLAlchemy (PostgreSQL)
+- **Parsing & Vector** : Crawl4AI, FAISS, PostgreSQL
 - **Monitoring** : Ragas (Évaluation de la qualité)
 
 ---
