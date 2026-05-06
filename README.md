@@ -100,10 +100,8 @@ SECRET_KEY=votre_cle_secrete_jwt
 ```
 
 ### 4. Initialisation de la Base de Données
-```bash
-# Assurez-vous que PostgreSQL est lancé et que la DB existe
-python fix_db.py # Script utilitaire pour s'assurer que les tables sont correctes
-```
+Executer le fichier sql init.sql sur postgresql
+
 
 ### 5. Lancement du serveur
 ```bash
