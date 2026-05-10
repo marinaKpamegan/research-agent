@@ -50,9 +50,8 @@ The interface doesn't just "load" into a vacuum. The backend streams in real-tim
 - **Status Events**: Source selection, start of parallel searches, etc.
 
 ### 🛡️ Robustness & Observability
-- **Front-to-Back Error Handling**: Interception of session errors (401) and backend crashes with immediate notification to the frontend via the SSE stream.
 - **Recursion Guard**: Graph depth limit to avoid infinite loops on complex searches.
-- **RAGAS Evaluation**: Integrated pipeline to measure response faithfulness relative to the extracted context.
+- **RAGAS Evaluation**: Integrated pipeline to measure response faithfulness relative to the extracted context (TODO)
 
 ---
 
@@ -75,7 +74,7 @@ The interface doesn't just "load" into a vacuum. The backend streams in real-tim
 
 ### 2. Installation
 ```bash
-git clone <your-backend-repo>
+git clone https://github.com/marinaKpamegan/research-agent
 cd research-agent
 python -m venv .venv
 source .venv/bin/activate
