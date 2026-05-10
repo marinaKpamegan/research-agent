@@ -7,32 +7,30 @@ validators
 arxiv
 sqlalchemy
 passlib[bcrypt]
-bcrypt==4.0.1
+bcrypt
 python-jose[cryptography]
 pydantic_settings
 python-multipart
 psycopg2-binary
 python-dotenv
 # LLM interaction
-langchain-openrouter>=0.1.0
+langchain-openrouter
 langchain-openai
 datasets
 rank-bm25
 
 # Scientific papers
-arxiv>=2.4.0
+arxiv
 
 # MCP Client Protocol
-mcp>=1.3.0
-httpx>=0.28.0
-datagouv-mcp>=0.1.0
+mcp
+httpx
 crawl4ai
 langchain-community
 faiss-cpu
 sentence-transformers
 transformers
 torch
-duckduckgo-search
 langgraph
 sentencepiece
 protobuf
