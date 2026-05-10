@@ -54,7 +54,6 @@ class ResearchAgent:
         workflow.add_edge("search_datagouv", "generate_answer")
         workflow.add_edge("search_web", "generate_answer")
         
-        workflow.add_edge("search_web", "generate_answer")
         workflow.add_edge("generate_answer", END)
         
         return workflow.compile()
@@ -361,7 +360,7 @@ Aucune ponctuation, aucune explication.
         try:
             searx = SearxSearchWrapper(searx_host=settings.SEARXNG_URL)
             # On utilise results() pour obtenir des dictionnaires avec 'link' et 'title'
-            results = await asyncio.to_thread(searx.results, web_query, num_results=15)
+            results = await asyncio.to_thread(searx.results, web_query, num_results=12)
             urls = [r["link"] for r in results if "link" in r]
             logger.info(f"Web results: {urls}")
         except Exception as e:
@@ -461,136 +460,98 @@ Consignes :
         current_source = ""
         thought_buffer = {}
         
-        async for event in self.graph.astream_events(initial_state, version="v2"):
-            kind = event["event"]
-            name = event["name"]
-            metadata = event.get("metadata", {})
-            langgraph_node = metadata.get("langgraph_node", "")
-            tags = event.get("tags", [])
-            
-            # Afficher le bloc de raisonnement complet à la fin du nœud
-            if kind == "on_chain_end" and langgraph_node in ["route_query", "search_arxiv", "search_pwc", "search_web"]:
-                thought = thought_buffer.get(langgraph_node, "")
-                if thought:
-                    yield json.dumps({"step": "thinking_block", "message": thought, "data": None})
-                    thought_buffer[langgraph_node] = ""
-            
-            # Capturer la source choisie dès que le router termine
-            if kind == "on_chain_end" and langgraph_node == "route_query":
-                output = event["data"].get("output", {})
-                if isinstance(output, dict) and "selected_source" in output:
-                    current_source = output["selected_source"]
-                    source_labels = {
-                        "arxiv": "Source choisie : arXiv",
-                        "paperswithcode": "Source choisie : Papers With Code",
-                        "datagouv": "Source choisie : data.gouv.fr",
-                        "web": "Source choisie : Web (Général)"
-                    }
-                    yield json.dumps({
-                        "step": "source_selected",
-                        "message": source_labels.get(current_source, current_source),
-                        "data": {"source": current_source}
-                    })
-            
-            # Nodes
-            if kind == "on_chain_start":
-                if langgraph_node == "route_query":
-                    try:
-                        async for event in self.graph.astream_events(initial_state, version="v2"):
-                            kind = event["event"]
-                            name = event["name"]
-                            metadata = event.get("metadata", {})
-                            langgraph_node = metadata.get("langgraph_node", "")
-                            tags = event.get("tags", [])
+        try:
+            async for event in self.graph.astream_events(initial_state, version="v2"):
+                kind = event["event"]
+                name = event["name"]
+                metadata = event.get("metadata", {})
+                langgraph_node = metadata.get("langgraph_node", "")
+                
+                # 1. Routing & formatted messages for UI
+                if kind == "on_chain_start":
+                    if langgraph_node == "route_query":
+                        yield json.dumps({"step": "route_query", "message": "Analyse de la demande... Catégorie en cours de sélection.", "data": None})
+                    elif langgraph_node == "search_arxiv":
+                        if current_source == "paperswithcode":
+                            yield json.dumps({"step": "fallback", "message": "Papers With Code sans résultat — repli d'urgence sur ArXiv...", "data": None})
+                        else:
+                            yield json.dumps({"step": "search_arxiv", "message": "Recherche sur ArXiv des articles scientifiques fondamentaux...", "data": None})
+                    elif langgraph_node == "search_pwc":
+                        if current_source == "arxiv":
+                            yield json.dumps({"step": "fallback", "message": "ArXiv sans résultat — repli d'urgence sur Papers With Code...", "data": None})
+                        else:
+                            yield json.dumps({"step": "search_pwc", "message": "Recherche sur Papers With Code (GitHub & benchmarks)...", "data": None})
+                    elif langgraph_node == "search_datagouv":
+                        yield json.dumps({"step": "search_datagouv", "message": "Consultation du catalogue d'État Data.gouv.fr...", "data": None})
+                    elif langgraph_node == "search_web":
+                        if current_source not in ["web", ""]:
+                            fallback_from = current_source.capitalize()
+                            if current_source == "paperswithcode": fallback_from = "PWC"
+                            if current_source == "datagouv": fallback_from = "Data.gouv"
+                            yield json.dumps({"step": "fallback", "message": f"{fallback_from} sans résultat — repli d'urgence ultime sur le Web...", "data": None})
+                        else:
+                            yield json.dumps({"step": "search_web", "message": "Recherche générale sur le Web avec SearXNG...", "data": None})
+                    elif langgraph_node == "generate_answer":
+                        yield json.dumps({"step": "generate_answer", "message": "Génération de la réponse finale...", "data": None})
+                
+                # 2. Source Selection Capture
+                if kind == "on_chain_end" and langgraph_node == "route_query":
+                    output = event["data"].get("output", {})
+                    if isinstance(output, dict) and "selected_source" in output:
+                        current_source = output["selected_source"]
+                        source_labels = {
+                            "arxiv": "Source choisie : arXiv",
+                            "paperswithcode": "Source choisie : Papers With Code",
+                            "datagouv": "Source choisie : data.gouv.fr",
+                            "web": "Source choisie : Web (Général)"
+                        }
+                        yield json.dumps({
+                            "step": "source_selected",
+                            "message": source_labels.get(current_source, current_source),
+                            "data": {"source": current_source}
+                        })
+                
+                # 3. Reasoning & Thinking blocks
+                if kind == "on_tool_start":
+                    if name == "query_pdf_document":
+                        yield json.dumps({"step": "reasoning", "message": "En cours d'analyse du document PDF via vision (Gemini)...", "data": None})
+                    else:
+                        yield json.dumps({"step": "reasoning", "message": f"Utilisation de l'outil : {name}", "data": None})
+                        
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"].content
+                    if chunk and isinstance(chunk, str):
+                        if langgraph_node == "generate_answer" or name == "generate_answer":
+                            yield json.dumps({"step": "stream", "message": chunk, "data": None})
+                        elif langgraph_node in ["route_query", "search_arxiv", "search_pwc", "search_web"] or name in ["route_query", "generate_web_query"]:
+                            node_key = langgraph_node or name
+                            thought_buffer[node_key] = thought_buffer.get(node_key, "") + chunk
+                
+                if kind == "on_chain_end" and langgraph_node in ["route_query", "search_arxiv", "search_pwc", "search_web"]:
+                    thought = thought_buffer.get(langgraph_node, "")
+                    if thought:
+                        yield json.dumps({"step": "thinking_block", "message": thought, "data": None})
+                        thought_buffer[langgraph_node] = ""
+
+                # 4. State updates and accumulation
+                if kind == "on_chain_end":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        for k, v in output.items():
+                            if k in ["crawled_content", "urls", "pending_backgroundtasks"] and k in last_state and isinstance(v, list):
+                                for item in v:
+                                    if item not in last_state[k]:
+                                        last_state[k].append(item)
+                                logger.info(f"Accumulated {k}: {len(last_state[k])} items total (added {len(v)})")
+                            else:
+                                last_state[k] = v
+                        if "answer" in output:
+                            logger.info(f"Answer updated in state (length: {len(output['answer'])})")
                             
-                            # Afficher le bloc de raisonnement complet à la fin du nœud
-                            if kind == "on_chain_end" and langgraph_node in ["route_query", "search_arxiv", "search_pwc", "search_web"]:
-                                thought = thought_buffer.get(langgraph_node, "")
-                                if thought:
-                                    yield json.dumps({"step": "thinking_block", "message": thought, "data": None})
-                                    thought_buffer[langgraph_node] = ""
-                            
-                            # Capturer la source choisie dès que le router termine
-                            if kind == "on_chain_end" and langgraph_node == "route_query":
-                                output = event["data"].get("output", {})
-                                if isinstance(output, dict) and "selected_source" in output:
-                                    current_source = output["selected_source"]
-                                    source_labels = {
-                                        "arxiv": "Source choisie : arXiv",
-                                        "paperswithcode": "Source choisie : Papers With Code",
-                                        "datagouv": "Source choisie : data.gouv.fr",
-                                        "web": "Source choisie : Web (Général)"
-                                    }
-                                    yield json.dumps({
-                                        "step": "source_selected",
-                                        "message": source_labels.get(current_source, current_source),
-                                        "data": {"source": current_source}
-                                    })
-                            
-                            # Nodes
-                            if kind == "on_chain_start":
-                                if langgraph_node == "route_query":
-                                    yield json.dumps({"step": "route_query", "message": "Analyse de la demande... Catégorie en cours de sélection.", "data": None})
-                                elif langgraph_node == "search_arxiv":
-                                    if current_source == "paperswithcode":
-                                        yield json.dumps({"step": "fallback", "message": "Papers With Code sans résultat — repli d'urgence sur ArXiv...", "data": None})
-                                    else:
-                                        yield json.dumps({"step": "search_arxiv", "message": "Recherche sur ArXiv des articles scientifiques fondamentaux...", "data": None})
-                                elif langgraph_node == "search_pwc":
-                                    if current_source == "arxiv":
-                                        yield json.dumps({"step": "fallback", "message": "ArXiv sans résultat — repli d'urgence sur Papers With Code...", "data": None})
-                                    else:
-                                        yield json.dumps({"step": "search_pwc", "message": "Recherche sur Papers With Code (GitHub & benchmarks)...", "data": None})
-                                elif langgraph_node == "search_datagouv":
-                                    yield json.dumps({"step": "search_datagouv", "message": "Consultation du catalogue d'État Data.gouv.fr...", "data": None})
-                                elif langgraph_node == "search_web":
-                                    if current_source not in ["web", ""]:
-                                        fallback_from = current_source.capitalize()
-                                        if current_source == "paperswithcode": fallback_from = "PWC"
-                                        if current_source == "datagouv": fallback_from = "Data.gouv"
-                                        yield json.dumps({"step": "fallback", "message": f"{fallback_from} sans résultat — repli d'urgence ultime sur le Web...", "data": None})
-                                    else:
-                                        yield json.dumps({"step": "search_web", "message": "Recherche générale sur le Web avec SearXNG...", "data": None})
-                                elif langgraph_node == "generate_answer":
-                                    yield json.dumps({"step": "generate_answer", "message": "Génération de la réponse finale...", "data": None})
-                                    
-                            # Reasoning: Tools
-                            if kind == "on_tool_start":
-                                if name == "query_pdf_document":
-                                    yield json.dumps({"step": "reasoning", "message": "En cours d'analyse du document PDF via vision (Gemini)...", "data": None})
-                                else:
-                                    yield json.dumps({"step": "reasoning", "message": f"Utilisation de l'outil : {name}", "data": None})
-                                    
-                            # Tokens
-                            if kind == "on_chat_model_stream":
-                                chunk = event["data"]["chunk"].content
-                                if chunk and isinstance(chunk, str):
-                                    if langgraph_node == "generate_answer" or name == "generate_answer":
-                                        yield json.dumps({"step": "stream", "message": chunk, "data": None})
-                                    elif langgraph_node in ["route_query", "search_arxiv", "search_pwc", "search_web"] or name in ["route_query", "generate_web_query"]:
-                                        node_key = langgraph_node or name
-                                        thought_buffer[node_key] = thought_buffer.get(node_key, "") + chunk
-                                    
-                            # Capture state updates from all nodes and the root graph
-                            if kind == "on_chain_end":
-                                output = event.get("data", {}).get("output", {})
-                                if isinstance(output, dict):
-                                    for k, v in output.items():
-                                        if k in ["crawled_content", "urls", "pending_backgroundtasks"] and k in last_state and isinstance(v, list):
-                                            # Accumulate lists for keys that use operator.add in AgentState
-                                            for item in v:
-                                                if item not in last_state[k]:
-                                                    last_state[k].append(item)
-                                            logger.info(f"Accumulated {k}: {len(last_state[k])} items total (added {len(v)})")
-                                        else:
-                                            last_state[k] = v
-                                    if "answer" in output:
-                                        logger.info(f"Answer updated in state (length: {len(output['answer'])})")
-                                        
-                    except Exception as e:
-                        logger.error(f"Erreur fatale dans stream_question: {e}", exc_info=True)
-                        yield json.dumps({"step": "error", "message": f"Une erreur est survenue : {str(e)}", "data": None})
-                        return
+        except Exception as e:
+            logger.error(f"Erreur fatale dans stream_question: {e}", exc_info=True)
+            yield json.dumps({"step": "error", "message": f"Une erreur est survenue : {str(e)}", "data": None})
+            return
                 
         # Final Event
         crawled = last_state.get('crawled_content', [])
