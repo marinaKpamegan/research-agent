@@ -1,10 +1,9 @@
 fastapi
 uvicorn[standard]
 httpx
+requests
 beautifulsoup4
 pydantic
-validators
-arxiv
 sqlalchemy
 passlib[bcrypt]
 bcrypt
@@ -13,25 +12,34 @@ pydantic_settings
 python-multipart
 psycopg2-binary
 python-dotenv
+sse-starlette
+
 # LLM interaction
 langchain-openrouter
 langchain-openai
+langchain-community
+langchain-huggingface
+langchain-text-splitters
 datasets
 rank-bm25
+ragas
 
-# Scientific papers
+# Scientific papers & Search
 arxiv
 
 # MCP Client Protocol
 mcp
-httpx
+
+# Scraping & Data Processing
 crawl4ai
-langchain-community
 faiss-cpu
 sentence-transformers
 transformers
 torch
+Pillow
+pymupdf
+
+# Orchestration
 langgraph
 sentencepiece
 protobuf
-pytesseract
