@@ -6,7 +6,7 @@ beautifulsoup4
 pydantic
 sqlalchemy
 passlib[bcrypt]
-bcrypt
+bcrypt==3.2.0
 python-jose[cryptography]
 pydantic_settings
 python-multipart
