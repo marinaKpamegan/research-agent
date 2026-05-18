@@ -55,10 +55,14 @@ class PwcService:
                         content_str += f"\nGitHub Repository: {repository_url}"
                         
                     papers.append({
-                        "url": pdf_url or f"https://paperswithcode.com/paper/{paper_id}",
-                        "title": f"[PapersWithCode] {title}",
                         "content": content_str,
-                        "score": 1.0
+                        "source": "pwc",
+                        "metadata": {
+                            "title": title,
+                            "url": pdf_url or f"https://paperswithcode.com/paper/{paper_id}",
+                            "date": item.get("published", "")
+                        },
+                        "score": 0.0
                     })
         except Exception as e:
             logger.error(f"Erreur lors de la recherche Papers With Code pour '{query}': {e}")

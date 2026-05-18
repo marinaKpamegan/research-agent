@@ -57,7 +57,7 @@ async def post_query(
     return {
         "answer": result.get("answer", "Erreur lors de la génération de la réponse."),
         "sources": [
-            {"title": c.get("title", f"Source {i+1}"), "url": c["url"]} 
+            {"title": c.get("metadata", {}).get("title", f"Source {i+1}"), "url": c.get("metadata", {}).get("url", "")} 
             for i, c in enumerate(crawled[:5])
         ],
         "used_context": used_context,

@@ -15,7 +15,7 @@ class UserInDB(User):
 
 class UserCreate(BaseModel):
     username: str
-    email: str
+    email: Optional[str] = None
     password: str
 
 

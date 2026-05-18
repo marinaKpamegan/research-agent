@@ -65,29 +65,42 @@ class ResearchAgent:
         question = state["question"]
         logger.info(f"Routing query: {question}")
         
-        prompt = f"""Tu es un routeur d'intentions expert. Analyse la question de l'utilisateur et détermine la meilleure source.
+        prompt = f"""Tu es un routeur d'intentions expert. Analyse la question et choisis la source.
 
-## RÈGLES CRITIQUES :
-1. Si la question mentionne un **Ministère**, une **Administration**, une **Collectivité** ou l'**État Français** (ex: Culture, Santé, Rhône, INSEE, Gouvernement) -> UTILISE TOUJOURS `datagouv`.
-2. Si la question porte sur des **Papiers de recherche**, de l'**IA théorique**, ou des **Benchmarks de modèles** -> UTILISE `science`.
-3. Pour tout le reste (entreprises, tutoriels, actu générale) -> UTILISE `web`.
+## RÈGLES (par ordre de priorité) :
 
-## Catégories :
-- science : Recherche scientifique, IA, Physique, Maths, Benchmarks, Code.
-- datagouv : Données publiques françaises, Ministères, Budgets, Statistiques d'état (INSEE), Décrets, Territoires.
-- web : Actualité, Entreprises (ESN, startups), Culture générale.
+1. DATAGOUV si la question porte sur :
+   - Des statistiques françaises (emploi, chômage, population, logement, éducation, santé...)
+   - Des territoires français (régions, départements, communes, Bretagne, Rhône, Paris...)
+   - Des données publiques (budgets, décrets, subventions, résultats électoraux...)
+   - Des organismes français (INSEE, Ministères, Collectivités, DARES, DREES...)
+   - Des chiffres, tendances ou évolutions sur la France
+
+2. SCIENCE si la question porte sur :
+   - Des papiers de recherche, publications académiques
+   - De l'IA théorique, benchmarks de modèles, algorithmes
+   - De la physique, mathématiques, biologie fondamentale
+
+3. WEB pour tout le reste :
+   - Actualité générale, entreprises, startups, ESN
+   - Tutoriels, culture générale, international
 
 ## Exemples
-| Question | Source | Raison |
-|---|---|---|
-| "Datasets du ministère de la culture" | datagouv | Ministère français |
-| "Budget de l'éducation nationale" | datagouv | Administration française |
-| "Papiers sur le RAG" | science | Recherche IA |
-| "Liste des ESN à Lyon" | web | Entreprises |
+| Question | Source |
+|---|---|
+| "Quels sont les derniers chiffres de l'emploi en Bretagne ?" | datagouv |
+| "Taux de chômage en France en 2023" | datagouv |
+| "Nombre d'écoles primaires dans le Rhône" | datagouv |
+| "Datasets du ministère de la culture" | datagouv |
+| "Papiers sur le RAG" | science |
+| "Dernières news sur OpenAI" | web |
+| "Liste des ESN à Lyon" | web |
 
 ## Réponse
 Réponds UNIQUEMENT par un seul mot parmi : science, datagouv, web
 Aucune ponctuation, aucune explication.
+
+Question : {{question}}
 """
         from langchain_openai import ChatOpenAI
         from app.core.config import settings
@@ -123,6 +136,51 @@ Aucune ponctuation, aucune explication.
             return ["search_arxiv", "search_pwc"]
         return [f"search_{source}"]
 
+    async def _calculate_similarities(self, question: str, contents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Calcule la similarité cosinus entre la question et le contenu de chaque source."""
+        if not contents or not self.faiss_service or not self.faiss_service.embeddings:
+            return contents
+            
+        import numpy as np
+        import asyncio
+        
+        try:
+            # Récupérer l'embedding de la question
+            q_emb = await asyncio.to_thread(self.faiss_service.embeddings.embed_query, question)
+            q_emb = np.array(q_emb)
+            q_norm = np.linalg.norm(q_emb)
+            if q_norm == 0:
+                return contents
+                
+            # Extraire les textes (tronqués pour éviter les limites de tokens du modèle d'embedding)
+            texts = [c.get("content", "")[:3000] for c in contents]
+            
+            # Récupérer les embeddings des contenus
+            c_embs = await asyncio.to_thread(self.faiss_service.embeddings.embed_documents, texts)
+            
+            for i, c in enumerate(contents):
+                c_emb = np.array(c_embs[i])
+                c_norm = np.linalg.norm(c_emb)
+                if c_norm > 0:
+                    raw_score = np.dot(q_emb, c_emb) / (q_norm * c_norm)
+                    
+                    # Système de pondération par source
+                    source_weights = {
+                        "datagouv": 1.3, # Données publiques prioritaires
+                        "arxiv": 1.2,    # Données scientifiques fiables
+                        "pwc": 1.2,      # Données scientifiques fiables
+                        "web": 1.0       # Web général (standard)
+                    }
+                    weight = source_weights.get(c.get("source", "web"), 1.0)
+                    
+                    # Le score final est pondéré pour favoriser les sources d'autorité
+                    c["score"] = float(raw_score * weight)
+                    
+            return contents
+        except Exception as e:
+            logger.error(f"Erreur lors du calcul des similarités globales: {e}")
+            return contents
+
     async def _search_arxiv(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
         """Node: Search ArXiv for scientific papers."""
         question = state["question"]
@@ -144,12 +202,17 @@ Aucune ponctuation, aucune explication.
         content = []
         for p in papers:
             content.append({
-                "url": p["pdf_url"] or p["id"],
-                "title": f"[ArXiv] {p['title']}",
                 "content": f"Authors: {', '.join(p['authors'])}\nSummary: {p['summary']}",
-                "score": 1.0
+                "source": "arxiv",
+                "metadata": {
+                    "title": p['title'],
+                    "url": p["pdf_url"] or p["id"],
+                    "date": ""
+                },
+                "score": 0.0
             })
             
+        content = await self._calculate_similarities(question, content)
         return {"crawled_content": content}
 
     async def _search_pwc(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -165,6 +228,7 @@ Aucune ponctuation, aucune explication.
         logger.info(f"PWC query translation: {pwc_query}")
         
         content = await self.pwc_service.search_papers(pwc_query, max_results=3)
+        content = await self._calculate_similarities(question, content)
         return {"crawled_content": content}
 
     async def _search_datagouv(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -210,7 +274,7 @@ Aucune ponctuation, aucune explication.
                         api_key=settings.OPENROUTER_API_KEY, 
                         model=settings.DEFAULT_AI_MODEL,
                         temperature=0.8,
-                        max_tokens=5000,
+                        max_tokens=2000,
                         streaming=True
                     )
                     
@@ -299,35 +363,54 @@ Aucune ponctuation, aucune explication.
                         if r_id in discovered_resources:
                             res = discovered_resources[r_id]
                             content.append({
-                                "url": res["url"],
-                                "title": f"[Data.Gouv] {res['title']}",
                                 "content": f"Données extraites de ce fichier pour répondre à : {question}",
-                                "score": 1.1 # Priorité légèrement supérieure car c'est de la donnée brute
+                                "source": "datagouv",
+                                "metadata": {
+                                    "title": res['title'],
+                                    "url": res["url"],
+                                    "date": ""
+                                },
+                                "score": 0.0
                             })
                             sources_added += 1
                     
                     # On ajoute quand même l'analyse globale si elle contient du texte
                     if final_msg:
                         content.append({
-                            "url": url,
-                            "title": "[Data.Gouv] Synthèse de l'Analyse MCP",
                             "content": final_msg,
-                            "score": 1.0
+                            "source": "datagouv",
+                            "metadata": {
+                                "title": "Synthèse de l'Analyse MCP",
+                                "url": url,
+                                "date": ""
+                            },
+                            "score": 0.0
                         })
                 else:
                     content.append({
-                        "url": url, 
-                        "title": "Erreur Data.gouv", 
-                        "content": "Aucun outil MCP récupéré via la connexion Stateless HTTP."
+                        "content": "Aucun outil MCP récupéré via la connexion Stateless HTTP.",
+                        "source": "datagouv",
+                        "metadata": {
+                            "title": "Erreur Data.gouv",
+                            "url": url,
+                            "date": ""
+                        },
+                        "score": 0.0
                     })
             except Exception as e:
                 logger.error(f"Erreur d'exécution de l'agent Datagouv: {e}")
                 content.append({
-                    "url": url, 
-                    "title": "Erreur Data.gouv", 
-                    "content": f"Echec de connexion MCP SSE : {e}"
+                    "content": f"Echec de connexion MCP SSE : {e}",
+                    "source": "datagouv",
+                    "metadata": {
+                        "title": "Erreur Data.gouv",
+                        "url": url,
+                        "date": ""
+                    },
+                    "score": 0.0
                 })
                 
+        content = await self._calculate_similarities(question, content)
         return {"crawled_content": content, "pending_backgroundtasks": bg_tasks_list if 'bg_tasks_list' in locals() else []}
 
     async def _search_web(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -373,12 +456,17 @@ Aucune ponctuation, aucune explication.
             scraped = await crawler.scrape_urls(urls)
             for item in scraped:
                 new_content.append({
-                    "url": item["url"], 
-                    "title": item["title"] or "Web Page", 
                     "content": item["markdown"],
-                    "score": 1.0
+                    "source": "web",
+                    "metadata": {
+                        "title": item["title"] or "Web Page",
+                        "url": item["url"],
+                        "date": ""
+                    },
+                    "score": 0.0
                 })
                 
+        new_content = await self._calculate_similarities(question, new_content)
         return {"crawled_content": new_content, "urls": urls}
 
     async def _generate_answer(self, state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
@@ -393,10 +481,89 @@ Aucune ponctuation, aucune explication.
         if not content:
             return {"answer": f"Désolé, je n'ai trouvé aucune information pertinente sur la source '{source}' pour répondre à votre question."}
             
-        # Prepare context with titles and URLs for the LLM
+        # Chunking et Vector Search si FAISS est disponible
         context_blocks = []
-        for i, c in enumerate(content):
-            context_blocks.append(f"Source [{i+1}]: {c.get('title', 'Sans titre')}\nURL: {c['url']}\nContenu: {c['content'][:3000]}")
+        if content and self.faiss_service and self.faiss_service.embeddings:
+            try:
+                from langchain_text_splitters import RecursiveCharacterTextSplitter
+                from langchain_community.vectorstores import FAISS
+                from langchain_core.documents import Document
+                import asyncio
+                
+                # 1. Chunking
+                splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=200)
+                docs = []
+                for i, c in enumerate(content):
+                    meta = c.get("metadata", {})
+                    # Extraire le texte principal
+                    text_content = c.get("content", "")
+                    if not text_content.strip():
+                        continue
+                        
+                    chunks = splitter.split_text(text_content)
+                    for chunk in chunks:
+                        docs.append(Document(
+                            page_content=chunk,
+                            metadata={
+                                "source_origin": c.get("source", "inconnue"),
+                                "title": meta.get("title", f"Source {i+1}"),
+                                "url": meta.get("url", ""),
+                            }
+                        ))
+                
+                # 2. Vector Search (FAISS en mémoire)
+                if docs:
+                    logger.info(f"Indexing {len(docs)} chunks ephemerally for question: '{question}'")
+                    
+                    def create_and_search():
+                        vectorstore = FAISS.from_documents(docs, self.faiss_service.embeddings)
+                        # similarity_search_with_relevance_scores retourne (Document, score_normalisé)
+                        # On récupère les 15 meilleurs chunks
+                        return vectorstore.similarity_search_with_relevance_scores(question, k=15)
+                        
+                    results_with_scores = await asyncio.to_thread(create_and_search)
+                    
+                    # 3. Reranking (TODO à améliorer)
+                    if self.reranker and results_with_scores:
+                        logger.info(f"Reranking {len(results_with_scores)} retrieved chunks...")
+                        # Extraire les documents purs pour le reranker
+                        retrieved_docs = [res[0] for res in results_with_scores]
+                        final_docs = self.reranker.rerank(question, retrieved_docs, k=8)
+                        
+                        # Construire le contexte avec les scores du reranker
+                        for i, doc in enumerate(final_docs):
+                            meta = doc.metadata
+                            score = meta.get("relevance_score", 0.0)
+                            logger.info(f"Reranked chunk {i+1} with score: {score:.3f}")
+                            logger.info(f"Source: {meta.get('source_origin')}")
+                            logger.info(f"Title: {meta.get('title')}")
+                            logger.info(f"URL: {meta.get('url')}")
+                            context_blocks.append(
+                                f"Source [{i+1}] ({meta.get('source_origin')} - Relevance: {score:.3f}): {meta.get('title')}\n"
+                                f"URL: {meta.get('url')}\n"
+                                f"Contenu: {doc.page_content}"
+                            )
+                    else:
+                        # Si pas de reranker, utiliser les scores FAISS
+                        for i, (doc, score) in enumerate(results_with_scores):
+                            meta = doc.metadata
+                            context_blocks.append(
+                                f"Source [{i+1}] ({meta.get('source_origin')} - Similarity: {score:.3f}): {meta.get('title')}\n"
+                                f"URL: {meta.get('url')}\n"
+                                f"Contenu: {doc.page_content}"
+                            )
+                            
+            except Exception as e:
+                logger.error(f"Error during ephemeral RAG: {e}. Falling back to full content.", exc_info=True)
+                # Fallback: utiliser le contenu complet tronqué si le RAG échoue
+                for i, c in enumerate(content):
+                    meta = c.get("metadata", {})
+                    context_blocks.append(f"Source [{i+1}]: {meta.get('title', 'Sans titre')}\nURL: {meta.get('url', '')}\nContenu: {c.get('content', '')[:3000]}")
+        else:
+            # Fallback simple si pas de FAISS
+            for i, c in enumerate(content):
+                meta = c.get("metadata", {})
+                context_blocks.append(f"Source [{i+1}]: {meta.get('title', 'Sans titre')}\nURL: {meta.get('url', '')}\nContenu: {c.get('content', '')[:3000]}")
             
         context_str = "\n\n---\n\n".join(context_blocks)
         interests_str = f"L'utilisateur s'intéresse particulièrement à : {', '.join(interests)}\n" if interests else ""
@@ -426,7 +593,7 @@ Consignes :
             model=settings.DEFAULT_AI_MODEL,
             streaming=True,
             temperature=0.8,
-            max_tokens=3000
+            max_tokens=2000
         ).with_config({"run_name": "generate_answer"})
         
         messages = [{"role": "user", "content": prompt}]
@@ -557,7 +724,7 @@ Consignes :
         crawled = last_state.get('crawled_content', [])
         payload = {
             "answer": last_state.get("answer", ""),
-            "sources": [{"title": c.get("title", f"Source {i+1}"), "url": c["url"]} for i, c in enumerate(crawled[:20])],
+            "sources": [{"title": c.get("metadata", {}).get("title", f"Source {i+1}"), "url": c.get("metadata", {}).get("url", "")} for i, c in enumerate(crawled[:20])],
             "selected_source": last_state.get("selected_source", ""),
             "pending_backgroundtasks": last_state.get("pending_backgroundtasks", []),
             "_raw_crawled": crawled
